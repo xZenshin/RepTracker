@@ -1,0 +1,20 @@
+# Local Postgres for development. Production uses the host's managed database instead.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: reptracker
+      POSTGRES_USER: reptracker
+      POSTGRES_PASSWORD: reptracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reptracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

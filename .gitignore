@@ -55,3 +55,10 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Vite writes the built SPA here; it is produced by the build, not checked in.
+src/RepTracker.Api/wwwroot/
+
+# Web app
+node_modules/
+src/web/dist/

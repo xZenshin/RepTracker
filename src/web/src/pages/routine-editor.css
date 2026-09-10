@@ -1,0 +1,87 @@
+.routine-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.routine-row > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.routine-row .order {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.routine-row .order button {
+  width: 26px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--text-faint);
+  font-size: 0.55rem;
+  line-height: 1;
+}
+
+.routine-row .order button:disabled {
+  opacity: 0.3;
+}
+
+.routine-row .titles {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.routine-row .titles strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Five target fields wrap to two rows on a phone and sit on one line on a wide screen. */
+.routine-row .targets {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.routine-row .targets label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.routine-row .targets .label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.routine-row .targets .input,
+.routine-row .targets .select {
+  min-height: 40px;
+  font-size: 15px;
+}
+
+.routine-row .targets .rest {
+  grid-column: span 2;
+}
+
+@media (min-width: 620px) {
+  .routine-row .targets {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .routine-row .targets .rest {
+    grid-column: auto;
+  }
+}

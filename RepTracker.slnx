@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RepTracker.Api/RepTracker.Api.csproj" />
+  </Folder>
+</Solution>

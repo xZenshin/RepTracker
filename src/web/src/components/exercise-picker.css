@@ -1,0 +1,88 @@
+.picker-search {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.picker-search svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  translate: 0 -50%;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.picker-search .input {
+  padding-left: 36px;
+}
+
+/* Horizontally scrolling filter row: twelve muscle groups will never fit across a phone. */
+.picker-filters {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 0 -14px 14px;
+  padding: 0 14px 4px;
+  scrollbar-width: none;
+}
+
+.picker-filters::-webkit-scrollbar {
+  display: none;
+}
+
+.picker-filters button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.picker-filters button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.picker-group + .picker-group {
+  margin-top: 16px;
+}
+
+.picker-group > h3 {
+  position: sticky;
+  top: -14px;
+  z-index: 1;
+  margin: 0 -14px 6px;
+  padding: 6px 14px;
+  background: var(--surface);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 0.68rem;
+}
+
+.picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: var(--touch);
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  text-align: left;
+}
+
+.picker-item:hover {
+  background: var(--surface-2);
+}
+
+.picker-item .name {
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

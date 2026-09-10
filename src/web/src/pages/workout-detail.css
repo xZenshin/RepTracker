@@ -1,0 +1,69 @@
+.detail-totals {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.detail-totals > div {
+  padding: 12px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+.detail-totals b {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.note-card p {
+  margin-top: 6px;
+  white-space: pre-wrap;
+}
+
+.detail-exercise .card-title h2 a:hover {
+  color: var(--accent);
+}
+
+.detail-sets {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.detail-sets th {
+  text-align: left;
+  padding-bottom: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.detail-sets th:not(:first-child),
+.detail-sets td:not(:first-child) {
+  text-align: right;
+}
+
+.detail-sets td {
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+  /* Values like "125.5 kg" must never break across two lines. */
+  white-space: nowrap;
+}
+
+.detail-sets tr.warmup td {
+  color: var(--text-faint);
+}
+
+.detail-sets td:first-child {
+  width: 38px;
+  color: var(--text-dim);
+  font-weight: 600;
+}

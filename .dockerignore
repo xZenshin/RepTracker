@@ -1,0 +1,13 @@
+**/node_modules
+**/bin
+**/obj
+**/dist
+# Built by the web stage inside the image; a stale local copy must never leak in.
+src/RepTracker.Api/wwwroot
+.git
+.vs
+.idea
+**/.DS_Store
+**/*.user
+docker-compose.yml
+README.md

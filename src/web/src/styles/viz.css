@@ -1,0 +1,314 @@
+/*
+  Chart colours, kept separate from the UI theme.
+
+  These are not picked by eye. The two-slot categorical pair and the four-step sequential ramp were
+  run through the palette validator against this app's own light and dark surfaces, and clear the
+  lightness band, chroma floor, colour-vision separation and contrast checks in both modes.
+
+  Charts are written against these roles, never raw hex, so a theme switch happens in one place.
+  Dark is the base here because the app is dark by default; light follows under the media query,
+  matching how theme.css is organised.
+*/
+
+.viz {
+  --series-1: #d95926; /* the metric in focus */
+  --series-2: #3987e5; /* its comparison, e.g. a rolling average */
+
+  --heat-1: #184f95;
+  --heat-2: #256abf;
+  --heat-3: #3987e5;
+  --heat-4: #86b6ef;
+  --heat-0: var(--surface-3);
+
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --ink-muted: #898781;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) .viz {
+    --series-1: #eb6834;
+    --series-2: #2a78d6;
+
+    --heat-1: #86b6ef;
+    --heat-2: #5598e7;
+    --heat-3: #2a78d6;
+    --heat-4: #1c5cab;
+
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+  }
+}
+
+/* ---------- shared chart chrome ---------- */
+
+.chart-frame {
+  width: 100%;
+  /* Charts need a declared height: their container is flex/grid and would otherwise collapse. */
+  height: 240px;
+}
+
+.chart-frame.tall {
+  height: 300px;
+}
+
+.viz-tooltip {
+  min-width: 150px;
+  padding: 9px 11px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  font-size: 0.82rem;
+}
+
+.viz-tooltip .head {
+  font-weight: 650;
+  margin-bottom: 5px;
+}
+
+.viz-tooltip .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+/* The swatch carries the series identity; the text beside it stays in ink colours. */
+.viz-tooltip .swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: 0 0 9px;
+}
+
+.viz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 10px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.viz-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.viz-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.viz-legend i.line {
+  height: 2px;
+  border-radius: 1px;
+}
+
+/* ---------- muscle group bars ---------- */
+
+.muscle-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.muscle-row {
+  display: grid;
+  grid-template-columns: 82px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.84rem;
+}
+
+.muscle-track {
+  position: relative;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+/*
+  The shaded band is roughly 10-20 hard sets a week, the range most of the hypertrophy literature
+  lands on. Drawing it behind the bar turns "is this enough?" into something you can see.
+*/
+.muscle-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--series-2) 14%, transparent);
+  border-left: 1px dashed color-mix(in srgb, var(--series-2) 45%, transparent);
+  border-right: 1px dashed color-mix(in srgb, var(--series-2) 45%, transparent);
+}
+
+.muscle-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 0 4px 4px 0;
+  background: var(--series-1);
+}
+
+.muscle-row .value {
+  min-width: 66px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+/* ---------- consistency heatmap ---------- */
+
+.heatmap-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.heatmap-wrap {
+  width: max-content;
+}
+
+.heatmap-months {
+  display: grid;
+  grid-template-columns: repeat(var(--weeks), 12px);
+  gap: 3px;
+  margin-bottom: 5px;
+  font-size: 0.68rem;
+  color: var(--text-faint);
+}
+
+/* Labels sit on one column but need to spill right over the next few without pushing them. */
+.heatmap-months span {
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.heatmap {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 12px);
+  gap: 3px;
+  width: max-content;
+}
+
+.heat-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--heat-0);
+}
+
+.heat-cell.l1 { background: var(--heat-1); }
+.heat-cell.l2 { background: var(--heat-2); }
+.heat-cell.l3 { background: var(--heat-3); }
+.heat-cell.l4 { background: var(--heat-4); }
+
+.heat-legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  font-size: 0.74rem;
+  color: var(--text-faint);
+}
+
+/* ---------- stat tiles ---------- */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+@media (min-width: 760px) {
+  .tiles {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.tile {
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.tile .label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 7px;
+}
+
+.tile .label svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tile .value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.tile .foot {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+/* ---------- insight lists ---------- */
+
+.insight-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.insight-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--touch);
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+}
+
+.insight-row:hover {
+  background: var(--surface-2);
+}
+
+.insight-row .name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insight-row .meta {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.insight-row .status-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}

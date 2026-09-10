@@ -1,0 +1,597 @@
+/*
+  One place for every colour, radius and step of spacing.
+
+  Dark is the default rather than the alternative: this is used in a gym, often at night, held in
+  one hand, and a bright screen between sets is unpleasant. The light palette follows for desktop.
+*/
+
+:root {
+  color-scheme: dark;
+
+  --bg: #0d0f12;
+  --surface: #16191e;
+  --surface-2: #1e2229;
+  --surface-3: #272c35;
+  --border: #2c323c;
+  --border-strong: #3d4553;
+
+  --text: #f2f4f7;
+  --text-dim: #98a1b0;
+  --text-faint: #6a7381;
+
+  --accent: #ff8a3d;
+  --accent-soft: #3a2415;
+  --accent-ink: #1a0f06;
+
+  --success: #3ecf8e;
+  --success-soft: #12301f;
+  --warn: #f5c451;
+  --warn-soft: #332a12;
+  --danger: #f2685f;
+  --danger-soft: #351a1a;
+  --info: #5aa9f5;
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.28);
+
+  /* Nothing interactive is smaller than this: it is being tapped by a tired thumb. */
+  --touch: 44px;
+
+  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+
+  --nav-height: 62px;
+  --max-width: 1240px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --surface-2: #f0f2f5;
+    --surface-3: #e4e8ed;
+    --border: #dde1e7;
+    --border-strong: #c2c9d3;
+
+    --text: #131720;
+    --text-dim: #5a6472;
+    --text-faint: #8b95a3;
+
+    --accent: #e2661a;
+    --accent-soft: #fdeee2;
+    --accent-ink: #ffffff;
+
+    --success: #12915d;
+    --success-soft: #e2f5ec;
+    --warn: #a97806;
+    --warn-soft: #fbf1d9;
+    --danger: #cf3b31;
+    --danger-soft: #fce9e7;
+    --info: #1c6fc4;
+
+    --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 8px 24px rgb(16 24 40 / 0.07);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  /* Stops iOS rubber-banding the whole page while scrolling a set list. */
+  overscroll-behavior-y: none;
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+h1 { font-size: 1.55rem; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 0.98rem; }
+
+p { margin: 0; }
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--text);
+}
+
+/* Every focusable thing gets the same visible ring; nothing relies on the browser default. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* ---------- layout ---------- */
+
+.app {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.page {
+  flex: 1;
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 16px 16px calc(var(--nav-height) + 28px);
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  min-height: var(--touch);
+}
+
+.page-header .subtitle {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-top: 2px;
+}
+
+/* ---------- navigation ---------- */
+
+.nav {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 30;
+  display: flex;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.nav a {
+  flex: 1;
+  min-height: var(--nav-height);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--text-faint);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  position: relative;
+}
+
+.nav a.active {
+  color: var(--accent);
+}
+
+.nav a svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* A dot on the Train tab whenever a workout is still open, so it cannot be forgotten. */
+.nav .live-dot {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  margin-left: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--surface);
+}
+
+@media (min-width: 900px) {
+  .app {
+    flex-direction: row;
+  }
+
+  .nav {
+    position: sticky;
+    top: 0;
+    inset: 0 auto 0 0;
+    height: 100vh;
+    width: 216px;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 20px 12px;
+    border-top: none;
+    border-right: 1px solid var(--border);
+    backdrop-filter: none;
+  }
+
+  .nav a {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    min-height: var(--touch);
+    padding: 0 14px;
+    border-radius: var(--radius);
+    font-size: 0.92rem;
+  }
+
+  .nav a.active {
+    background: var(--accent-soft);
+  }
+
+  .nav .live-dot {
+    position: static;
+    margin: 0 0 0 auto;
+    box-shadow: none;
+  }
+
+  .page {
+    padding: 28px 32px 48px;
+  }
+}
+
+.brand {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px 22px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .brand .mark {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    display: grid;
+    place-items: center;
+    font-size: 0.85rem;
+    font-weight: 800;
+  }
+}
+
+/* ---------- surfaces ---------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.card + .card {
+  margin-top: 12px;
+}
+
+.card-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.card-title h2 {
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
+.card-title .hint {
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+
+.grid {
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 760px) {
+  .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (min-width: 1080px) {
+  .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ---------- buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--touch);
+  padding: 0 18px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.06s ease;
+  white-space: nowrap;
+}
+
+.btn:active {
+  transform: scale(0.985);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn.primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+  background: var(--accent);
+}
+
+.btn.ghost {
+  background: none;
+  border-color: transparent;
+  color: var(--text-dim);
+}
+
+.btn.ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.btn.danger {
+  color: var(--danger);
+  border-color: transparent;
+  background: none;
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+
+.btn.block {
+  width: 100%;
+}
+
+.btn.sm {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 0.84rem;
+  border-radius: var(--radius-sm);
+}
+
+.btn.lg {
+  min-height: 54px;
+  font-size: 1rem;
+  border-radius: var(--radius-lg);
+}
+
+/* ---------- forms ---------- */
+
+.field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.field > .label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.field .help {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  min-height: var(--touch);
+  padding: 10px 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  /* 16px minimum, otherwise iOS Safari zooms the whole page on focus. */
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 34px;
+}
+
+/* ---------- pills, chips, badges ---------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.chip.accent { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.chip.success { background: var(--success-soft); border-color: transparent; color: var(--success); }
+.chip.warn { background: var(--warn-soft); border-color: transparent; color: var(--warn); }
+.chip.danger { background: var(--danger-soft); border-color: transparent; color: var(--danger); }
+
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.segmented button {
+  min-height: 34px;
+  padding: 0 13px;
+  border-radius: 9px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.segmented button.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+/* ---------- misc ---------- */
+
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.row.wrap { flex-wrap: wrap; }
+.row.between { justify-content: space-between; }
+.spacer { flex: 1; }
+
+.muted { color: var(--text-dim); }
+.faint { color: var(--text-faint); }
+.small { font-size: 0.82rem; }
+.tabular { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--mono); }
+
+.empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.empty h3 {
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0;
+}
+
+.error-text {
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.87rem;
+  font-weight: 500;
+}
+
+.banner.info { background: var(--accent-soft); color: var(--accent); }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s linear infinite;
+  border-radius: var(--radius);
+}
+
+@keyframes shimmer {
+  to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
