@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMe, useRoutine, useSaveRoutine } from '../api/hooks'
 import type { Exercise, SaveRoutineExercise, Units } from '../api/types'
@@ -27,12 +27,15 @@ export default function RoutineEditor() {
   const [notes, setNotes] = useState('')
   const [rows, setRows] = useState<Draft[]>([])
   const [picking, setPicking] = useState(false)
-  const [loaded, setLoaded] = useState(false)
+  const [loadedId, setLoadedId] = useState<string | null>(null)
 
   const units = user?.units ?? 'kg'
 
-  useEffect(() => {
-    if (!existing.data || loaded) return
+  // Seeding the form during render rather than from an effect: React applies these before painting,
+  // so the fields are never briefly empty, and the guard means later refetches cannot overwrite
+  // edits in progress.
+  if (existing.data && existing.data.id !== loadedId) {
+    setLoadedId(existing.data.id)
     setName(existing.data.name)
     setNotes(existing.data.notes ?? '')
     setRows(
@@ -49,8 +52,7 @@ export default function RoutineEditor() {
         notes: exercise.notes ?? null,
       })),
     )
-    setLoaded(true)
-  }, [existing.data, loaded])
+  }
 
   function update(key: string, patch: Partial<Draft>) {
     setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)))
@@ -245,7 +247,7 @@ export default function RoutineEditor() {
             {
               name: name.trim(),
               notes: notes.trim() || null,
-              exercises: rows.map(({ key, exerciseName, muscleGroup, ...rest }) => rest),
+              exercises: rows.map(toSaveExercise),
             },
             { onSuccess: () => navigate('/', { replace: true }) },
           )
@@ -263,6 +265,19 @@ export default function RoutineEditor() {
       ) : null}
     </main>
   )
+}
+
+/** Strips the fields the editor carries for display only, leaving what the API expects. */
+function toSaveExercise(row: Draft): SaveRoutineExercise {
+  return {
+    exerciseId: row.exerciseId,
+    targetSets: row.targetSets,
+    targetRepsMin: row.targetRepsMin,
+    targetRepsMax: row.targetRepsMax,
+    targetWeightKg: row.targetWeightKg,
+    restSeconds: row.restSeconds,
+    notes: row.notes,
+  }
 }
 
 function displayWeight(kg: number | null | undefined, units: Units): string {

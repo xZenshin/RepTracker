@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   useActiveWorkout, useAddSet, useAddWorkoutExercise, useDeleteSet, useDeleteWorkout,
@@ -278,12 +278,17 @@ function SetRow({
   // Held locally while typing so the field never fights the cache mid-keystroke; committed on blur.
   const [primary, setPrimary] = useState(() => primaryValue(set, modality, units))
   const [secondary, setSecondary] = useState(() => secondaryValue(set, modality))
+  const rowRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // Re-sync when the server's view of this set changes - but never over an input that currently
+    // has the cursor in it, or a refetch triggered by tabbing back to the app would wipe out a
+    // half-entered number.
+    if (rowRef.current?.contains(document.activeElement)) return
+
     setPrimary(primaryValue(set, modality, units))
     setSecondary(secondaryValue(set, modality))
-    // Re-syncs when the server view of this set changes, e.g. after prefilling from "previous".
-  }, [set.id, set.weightKg, set.reps, set.durationSeconds, set.distanceM, modality, units])
+  }, [set, modality, units])
 
   function commit(extra?: { isCompleted?: boolean }) {
     const payload = { weId, setId: set.id, ...parseInputs(primary, secondary, modality, units), ...extra }
@@ -299,7 +304,11 @@ function SetRow({
   const previousText = previous ? describePrevious(previous, modality, units) : '-'
 
   return (
-    <div className={`set-row${set.isCompleted ? ' done' : ''}${set.isWarmup ? ' warmup' : ''}`} role="row">
+    <div
+      ref={rowRef}
+      className={`set-row${set.isCompleted ? ' done' : ''}${set.isWarmup ? ' warmup' : ''}`}
+      role="row"
+    >
       <button
         className="set-index"
         type="button"
