@@ -17,7 +17,7 @@ container against a real Postgres. Nothing is stubbed or mocked.
 | | |
 |---|---|
 | Branch | `main`, clean |
-| Commits | `8bee7b6` initial → `72e02df` the build → `c730abb` refetch/lint fixes |
+| History | `8bee7b6` initial, then one commit per change — `git log` is the record, and each message says why |
 | API build | clean, 0 warnings |
 | Web typecheck | clean |
 | `oxlint` | clean, 0 warnings |
