@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useDeleteAccount, useLogout, useMe, useUpdateMe } from '../api/hooks'
 import type { Units } from '../api/types'
 import { toDisplay, toKg } from '../lib/units'
@@ -6,6 +7,7 @@ import { formatDateFull } from '../lib/time'
 import { AlertIcon } from '../components/Icons'
 
 export default function Settings() {
+  const navigate = useNavigate()
   const { data: user } = useMe()
   const update = useUpdateMe()
   const logout = useLogout()
@@ -103,7 +105,9 @@ export default function Settings() {
         <button
           className="btn block"
           type="button"
-          onClick={() => logout.mutate()}
+          // Signing out leaves the URL pointing at a page that now needs a session, so reset it -
+          // otherwise the next sign-in drops you back on Settings rather than the training screen.
+          onClick={() => logout.mutate(undefined, { onSettled: () => navigate('/', { replace: true }) })}
           disabled={logout.isPending}
         >
           Sign out

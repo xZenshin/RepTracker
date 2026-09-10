@@ -114,6 +114,13 @@ inputs holds focus; `RoutineEditor` seeds during render against the loaded routi
 the same bug: a refetch landing mid-edit replacing a value under the cursor. This is routine on a
 phone, where tabbing away and back triggers a refetch.
 
+**Never call `queryClient.clear()` to sign out.** It removes the query objects that mounted
+observers are attached to, and those observers keep reading the removed entry — so the `useMe()` in
+`App`, which gates the whole app, never sees the change and the user is left on a shell of empty
+pages until they reload. `signOut()` in `api/hooks.ts` writes `me` first and removes only the other
+keys. A 401 from any query or mutation routes through the same helper (`main.tsx`), so an expired
+or revoked session drops to the login screen the same way an explicit sign-out does.
+
 **Personal records are reconstructed by replaying history**, not stored in a records table. Editing
 or deleting a set therefore corrects the PR feed instead of leaving a phantom behind.
 `StatsService.BuildRecordHistory`.

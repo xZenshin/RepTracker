@@ -42,7 +42,7 @@ public static class ExerciseCatalog
         new("Chin-Up", "Back", "Bodyweight", BW, "pull"),
         new("Chest-Supported Row", "Back", "Machine", WR, "pull"),
         new("Face Pull", "Back", "Cable", WR, "pull"),
-        new("Barbell Shrug", "Back", "Barbell", WR, "pull"),
+        new("Kelso Shrug", "Back", "Barbell", WR, "pull"),
         new("Back Extension", "Back", "Bodyweight", BW, "pull"),
 
         // Shoulders
@@ -63,10 +63,12 @@ public static class ExerciseCatalog
         new("Incline Dumbbell Curl", "Biceps", "Dumbbell", WR, "pull"),
         new("Preacher Curl", "Biceps", "Machine", WR, "pull"),
         new("Cable Curl", "Biceps", "Cable", WR, "pull"),
+        new("Recline Curl", "Biceps", "Cable", WR, "pull"),
 
         // Triceps
         new("Close-Grip Bench Press", "Triceps", "Barbell", WR, "push"),
         new("Triceps Pushdown", "Triceps", "Cable", WR, "push"),
+        new("Single Arm Triceps Pushdown", "Triceps", "Cable", WR, "push"),
         new("Overhead Cable Extension", "Triceps", "Cable", WR, "push"),
         new("Skullcrusher", "Triceps", "Barbell", WR, "push"),
         new("Dumbbell Kickback", "Triceps", "Dumbbell", WR, "push"),

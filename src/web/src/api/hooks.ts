@@ -19,6 +19,20 @@ export const keys = {
   statExercise: (id: string, weeks: number) => ['stats', 'exercises', id, weeks] as const,
 }
 
+/**
+ * Drops the signed-in user's cached data and publishes the signed-out state.
+ *
+ * The order is load-bearing. queryClient.clear() removes the query objects that mounted observers
+ * are attached to, and those observers go on reading the removed entry - so the useMe() in App,
+ * which decides whether to render the app at all, would never see the change and the user would
+ * stay on a shell full of empty pages until a reload. Writing `me` first and removing only the
+ * other keys leaves that observer attached to a live entry, so the login screen appears at once.
+ */
+export function signOut(qc: QueryClient) {
+  qc.setQueryData(keys.me, null)
+  qc.removeQueries({ predicate: (query) => query.queryKey[0] !== keys.me[0] })
+}
+
 /** Anything derived from logged sets is stale the moment a set changes. */
 function invalidateTraining(qc: QueryClient) {
   void qc.invalidateQueries({ queryKey: ['workouts'] })
@@ -69,10 +83,9 @@ export function useLogout() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => api<void>('/auth/logout', { method: 'POST' }),
-    onSuccess: () => {
-      qc.clear()
-      qc.setQueryData(keys.me, null)
-    },
+    // Runs on failure too: if the call 401s the session was already gone, and staying "signed in"
+    // against a dead session is the worse outcome either way.
+    onSettled: () => signOut(qc),
   })
 }
 
@@ -93,10 +106,7 @@ export function useDeleteAccount() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => api<void>('/auth/me', { method: 'DELETE' }),
-    onSuccess: () => {
-      qc.clear()
-      qc.setQueryData(keys.me, null)
-    },
+    onSuccess: () => signOut(qc),
   })
 }
 
