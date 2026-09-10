@@ -47,6 +47,12 @@
   text-align: center;
 }
 
+/*
+ * `user-select: all` is what makes the code copyable by hand: one tap - or a long press on a
+ * phone, which then offers Copy - selects all twenty digits rather than the one group under the
+ * finger. It stays a div rather than a readonly input so it can wrap on a narrow screen, and so
+ * focusing it never triggers iOS's zoom on sub-16px fields.
+ */
 .issued-code {
   margin: 20px 0 16px;
   padding: 18px 12px;
@@ -58,6 +64,16 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   word-break: break-all;
+  cursor: pointer;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.copy-hint {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-faint);
 }
 
 .confirm {

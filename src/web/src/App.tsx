@@ -1,8 +1,8 @@
-import { Suspense, lazy, type ReactNode } from 'react'
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { Suspense, lazy, useState, type ReactNode } from 'react'
+import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useActiveWorkout, useMe } from './api/hooks'
 import { ChartIcon, DumbbellIcon, HistoryIcon, SettingsIcon } from './components/Icons'
-import Login from './pages/Login'
+import Login, { CodeIssued } from './pages/Login'
 import Train from './pages/Train'
 import ActiveWorkout from './pages/ActiveWorkout'
 import History from './pages/History'
@@ -17,9 +17,29 @@ const ExerciseDetail = lazy(() => import('./pages/ExerciseDetail'))
 
 export default function App() {
   const { data: user, isPending } = useMe()
+  const navigate = useNavigate()
+
+  // Registering signs you in as a side effect, so `user` is already set by the time the code
+  // screen would render. It therefore has to live above this gate rather than inside Login -
+  // otherwise the write to the `me` cache unmounts Login mid-flow and the one copy of the code
+  // the user will ever be shown is destroyed before it paints.
+  const [issuedCode, setIssuedCode] = useState<string | null>(null)
 
   if (isPending) return <BootSplash />
-  if (!user) return <Login />
+
+  if (issuedCode) {
+    return (
+      <CodeIssued
+        code={issuedCode}
+        onDone={() => {
+          setIssuedCode(null)
+          navigate('/', { replace: true })
+        }}
+      />
+    )
+  }
+
+  if (!user) return <Login onIssued={setIssuedCode} />
 
   return (
     <div className="app">

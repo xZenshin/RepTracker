@@ -1,19 +1,19 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useLogin, useRegister } from '../api/hooks'
 import { ApiError } from '../api/client'
 import { CODE_LENGTH, digitsOnly, formatCode, isWellFormed } from '../lib/loginCode'
-import { CheckIcon } from '../components/Icons'
+import { AlertIcon, CheckIcon, CopyIcon } from '../components/Icons'
+import { copyText } from '../lib/clipboard'
 import './login.css'
 
-type Mode = 'login' | 'register' | 'code-issued'
+type Mode = 'login' | 'register'
 
-export default function Login() {
+/**
+ * `onIssued` hands the new code up to App rather than showing it here, because registering also
+ * signs the user in - which unmounts this component. See the note on the gate in App.tsx.
+ */
+export default function Login({ onIssued }: { onIssued: (code: string) => void }) {
   const [mode, setMode] = useState<Mode>('login')
-  const [issued, setIssued] = useState<string | null>(null)
-
-  if (mode === 'code-issued' && issued) {
-    return <CodeIssued code={issued} />
-  }
 
   return (
     <div className="auth">
@@ -29,13 +29,7 @@ export default function Login() {
         {mode === 'login' ? (
           <SignIn onSwitch={() => setMode('register')} />
         ) : (
-          <SignUp
-            onSwitch={() => setMode('login')}
-            onIssued={(code) => {
-              setIssued(code)
-              setMode('code-issued')
-            }}
-          />
+          <SignUp onSwitch={() => setMode('login')} onIssued={onIssued} />
         )}
       </div>
     </div>
@@ -150,10 +144,31 @@ function SignUp({ onSwitch, onIssued }: { onSwitch: () => void; onIssued: (code:
 /**
  * The one moment the code exists outside the user's own records. It is stored only as a keyed
  * hash, so it genuinely cannot be shown again or recovered by anyone - hence the friction here.
+ *
+ * Getting the twenty digits off this screen therefore has to work on the first try, on whatever
+ * browser the user happens to be holding. Three ways out, in order: the copy button, which falls
+ * back through `copyText`; tapping the code, which selects all of it for a press-and-hold copy;
+ * and reading it off the screen. The middle one is what `user-select: all` buys: one tap, or one
+ * long press, selects the whole code. A readonly input would do the same, but any input small
+ * enough to fit twenty digits on a narrow phone is under the 16px that stops iOS zooming on focus.
  */
-function CodeIssued({ code }: { code: string }) {
+export function CodeIssued({ code, onDone }: { code: string; onDone: () => void }) {
   const [confirmed, setConfirmed] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copy, setCopy] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const codeRef = useRef<HTMLDivElement>(null)
+
+  // Only needed when the clipboard is refused - `user-select: all` already selects the whole code
+  // on a tap or a long press without any of this.
+  const selectAll = () => {
+    const node = codeRef.current
+    const selection = window.getSelection()
+    if (!node || !selection) return
+
+    const range = document.createRange()
+    range.selectNodeContents(node)
+    selection.removeAllRanges()
+    selection.addRange(range)
+  }
 
   return (
     <div className="auth">
@@ -164,24 +179,37 @@ function CodeIssued({ code }: { code: string }) {
           password manager, or written down.
         </p>
 
-        <div className="issued-code mono tabular">{formatCode(code)}</div>
+        <div ref={codeRef} className="issued-code mono tabular">
+          {formatCode(code)}
+        </div>
 
         <button
           className="btn block"
           type="button"
           onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(code)
-              setCopied(true)
-              setTimeout(() => setCopied(false), 2000)
-            } catch {
-              // Clipboard access can be refused; the code is on screen to copy by hand.
-              setCopied(false)
-            }
+            // The digits alone, without the display grouping - though the login field strips
+            // non-digits anyway, so a hand-copied code with spaces in it works too.
+            const ok = await copyText(code)
+            setCopy(ok ? 'copied' : 'failed')
+            if (ok) setTimeout(() => setCopy('idle'), 2000)
+            else selectAll()
           }}
         >
-          {copied ? 'Copied' : 'Copy code'}
+          {copy === 'copied' ? <CheckIcon className="icon-sm" /> : <CopyIcon className="icon-sm" />}
+          {copy === 'copied' ? 'Copied' : 'Copy code'}
         </button>
+
+        {copy === 'failed' ? (
+          <p className="banner" style={{ marginTop: 10 }} role="alert">
+            <AlertIcon className="icon-sm" style={{ flex: '0 0 auto', marginTop: 1 }} />
+            <span>
+              This browser would not let the app reach the clipboard. The code above is selected -
+              press and hold it and choose Copy, or write it down.
+            </span>
+          </p>
+        ) : (
+          <p className="copy-hint">Or tap the code to select it, then copy it by hand.</p>
+        )}
 
         <label className="confirm">
           <input
@@ -196,7 +224,7 @@ function CodeIssued({ code }: { code: string }) {
           className="btn primary lg block"
           type="button"
           disabled={!confirmed}
-          onClick={() => window.location.assign('/')}
+          onClick={onDone}
         >
           <CheckIcon className="icon-sm" />
           Start training
