@@ -237,8 +237,8 @@ function ExerciseFocus({
 }
 
 /**
- * The big steppers. They edit the next unticked set if there is one (a routine pre-plans its
- * sets), and otherwise a new set; the tick writes it and marks it done in one go.
+ * The big steppers. They edit the next unticked set if there is one (the server lays an exercise
+ * out as last time's sets), and otherwise a new set; the tick writes it and marks it done in one go.
  */
 function LogSetCard({
   workoutId, exercise, units, fields, onLogged,
@@ -778,8 +778,10 @@ function stepValue(text: string, field: FieldSpec, direction: 1 | -1): string {
 }
 
 /**
- * Where the steppers start: the planned values of the set being logged, else the last set done
- * this session (the common "same again" case), else the matching set from last time.
+ * Where the steppers start: the set being logged, which the server prefilled with last time's
+ * numbers; else, past the end of last time or on a first attempt, the last set done this session
+ * (the common "same again" case); else the matching set from last time. A first attempt with
+ * nothing logged yet starts empty.
  */
 function seedValues(
   exercise: WorkoutExercise, target: WorkoutSet | undefined, units: Units,

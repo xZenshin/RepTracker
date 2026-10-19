@@ -117,6 +117,13 @@ request. Which exercise is on screen lives in `sessionStorage` (`rt.current-exer
 rest timer, so a reload lands back on it. On a phone the tab bar is hidden on `/workout`
 (`.app.focus-mode`); Back is the way out.
 
+**A workout exercise opens on last time's sets, not the routine's targets.** Starting a routine
+or adding an exercise copies the sets from the most recent finished workout containing that
+exercise (any routine, warm-ups included, unticked), via `CarryOver` in `WorkoutEndpoints`. An
+exercise never done before starts clean: the routine's set count as empty rows, or no rows when
+added ad hoc. Routine target weight and reps are deliberately ignored here (owner decision,
+2026-10-19); they remain the written plan shown on the Train card.
+
 **The editors avoid effect-based state sync.** `SetRow` skips its re-sync while one of its own
 inputs holds focus; `RoutineEditor` and `LogSetCard` seed during render against the id of what they
 are editing. All guard the same bug: a refetch landing mid-edit replacing a value under the cursor. This is routine on a

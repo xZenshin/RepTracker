@@ -119,8 +119,12 @@ public static class WorkoutEndpoints
             workout.RoutineId = routine.Id;
             workout.Name = Validation.Text(body.Name, 60) ?? routine.Name;
 
-            // Lay the template out as empty sets, so the session becomes a matter of filling in
-            // blanks rather than adding rows one tap at a time between working sets.
+            // Lay the session out as last time's sets, so it opens on the numbers to match or beat
+            // rather than on blanks. Exercises never done before get the routine's set count as
+            // empty rows - a clean first entry, not the routine's targets.
+            var previous = await PreviousPerformance.LoadAsync(
+                db, userId, [.. routine.Exercises.Select(x => x.ExerciseId)], workout.Id, ct);
+
             foreach (var re in routine.Exercises.OrderBy(x => x.Position))
             {
                 var we = new WorkoutExercise
@@ -133,17 +137,8 @@ public static class WorkoutEndpoints
                     Notes = re.Notes,
                 };
 
-                for (var i = 0; i < Math.Min(re.TargetSets, options.Limits.SetsPerExercise); i++)
-                {
-                    we.Sets.Add(new WorkoutSet
-                    {
-                        Id = Guid.CreateVersion7(),
-                        WorkoutExerciseId = we.Id,
-                        Position = i,
-                        WeightKg = re.TargetWeightKg,
-                        Reps = re.TargetRepsMin,
-                    });
-                }
+                we.Sets.AddRange(CarryOver(
+                    we.Id, previous.GetValueOrDefault(re.ExerciseId), re.TargetSets, options.Limits.SetsPerExercise));
 
                 workout.Exercises.Add(we);
             }
@@ -223,6 +218,30 @@ public static class WorkoutEndpoints
 
     // ---- exercises within a workout ----
 
+    /// <summary>
+    /// The sets a workout exercise opens with: last time's, value for value and warm-ups included,
+    /// left unticked so nothing counts until it is done again. With no last time, `emptyCount`
+    /// blank rows.
+    /// </summary>
+    private static IEnumerable<WorkoutSet> CarryOver(
+        Guid weId, PreviousPerformanceDto? previous, int emptyCount, int limit)
+    {
+        IEnumerable<PreviousSetDto> template = previous?.Sets
+            ?? Enumerable.Repeat(new PreviousSetDto(null, null, null, null, false), emptyCount);
+
+        return template.Take(limit).Select((s, i) => new WorkoutSet
+        {
+            Id = Guid.CreateVersion7(),
+            WorkoutExerciseId = weId,
+            Position = i,
+            WeightKg = s.WeightKg,
+            Reps = s.Reps,
+            DurationSeconds = s.DurationSeconds,
+            DistanceM = s.DistanceM,
+            IsWarmup = s.IsWarmup,
+        });
+    }
+
     private static async Task<IResult> AddExercise(
         Guid id, AddWorkoutExerciseRequest body, AppDb db, HttpContext ctx,
         ClaimsPrincipal principal, AppOptions options, CancellationToken ct)
@@ -245,6 +264,12 @@ public static class WorkoutEndpoints
             ExerciseId = exercise.Id,
             Position = workout.Exercises.Count == 0 ? 0 : workout.Exercises.Max(x => x.Position) + 1,
         };
+
+        // Same as starting from a routine: last time's sets if there was a last time. A first
+        // attempt starts with no rows, and the first logged set creates one.
+        var previous = await PreviousPerformance.LoadAsync(db, userId, [exercise.Id], workout.Id, ct);
+        we.Sets.AddRange(CarryOver(
+            we.Id, previous.GetValueOrDefault(exercise.Id), emptyCount: 0, options.Limits.SetsPerExercise));
 
         db.WorkoutExercises.Add(we);
         await db.SaveChangesAsync(ct);
