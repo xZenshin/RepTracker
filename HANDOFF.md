@@ -1,6 +1,6 @@
 # Handoff
 
-State of RepTracker as of 2026-09-10. Written for whoever picks this up next — including
+State of RepTracker as of 2026-10-19. Written for whoever picks this up next — including
 future-you after a few months away.
 
 The [README](README.md) is the user-facing document: what it is, how to run it, how to deploy it,
@@ -53,7 +53,7 @@ src/RepTracker.Api/
 
 src/web/src/
   api/                  client (fetch + ApiError), types (mirrors the DTOs), hooks (TanStack Query)
-  lib/                  units, time, totals, loginCode, useRestTimer, useElapsed
+  lib/                  units, time, totals, loginCode, useRestTimer, useElapsed, useMediaQuery
   components/           Sheet, ExercisePicker, Icons
   pages/                one per route, each with its own .css
   styles/               theme.css (UI tokens), viz.css (chart tokens)
@@ -122,7 +122,9 @@ or adding an exercise copies the sets from the most recent finished workout cont
 exercise (any routine, warm-ups included, unticked), via `CarryOver` in `WorkoutEndpoints`. An
 exercise never done before starts clean: the routine's set count as empty rows, or no rows when
 added ad hoc. Routine target weight and reps are deliberately ignored here (owner decision,
-2026-10-19); they remain the written plan shown on the Train card.
+2026-10-19); they remain the written plan shown on the Train card. On such a first attempt, logging
+a set copies its values into the still-empty rows after it (`logged` in `ExerciseFocus`), so the
+next set is prefilled and a blank row can never be ticked as an empty set.
 
 **The editors avoid effect-based state sync.** `SetRow` skips its re-sync while one of its own
 inputs holds focus; `RoutineEditor` and `LogSetCard` seed during render against the id of what they
@@ -148,10 +150,32 @@ pull-ups record as zero volume and produce no strength estimate. The Settings co
 
 **The rest timer counts to a wall-clock instant**, not by decrementing a tick — phones throttle
 timers in backgrounded tabs, and the screen is off for most of a three-minute rest. The target is
-also written to `sessionStorage` so a reload does not lose it. `lib/useRestTimer.ts`.
+also written to `sessionStorage` so a reload does not lose it. `lib/useRestTimer.ts`. Its `add()`
+takes negative seconds (the dock's -15s) but never moves the end into the past.
+
+**The app makes no sound and no vibration.** Owner decision (2026-10-19): headphones are usually
+in, and a tone cut into whatever was playing. A finished rest shows "Go" in the dock and nothing
+else. Do not add an audio or `navigator.vibrate` cue back without asking.
+
+**`Sheet` reads `onClose` through a ref, and focuses itself once per opening.** Every caller passes
+`onClose` inline, and the rest timer re-renders the workout page four times a second; with
+`onClose` as an effect dependency the effect re-ran each time and its `focus()` pulled the cursor
+out of any field in the sheet. It also skips that `focus()` when a field inside already has focus,
+or `autoFocus` (the exercise picker's search) never sticks.
 
 **Stats bucket weeks in the browser's timezone.** The client sends `offsetMinutes`; the server
-clamps it to ±840. Weeks start Monday.
+clamps it to ±840. Weeks start Monday. The dashboard's periods read as months (1M/3M/6M/12M) but
+are whole weeks underneath — 4, 13, 26, 52 — because every section buckets by week.
+
+**The consistency calendar follows the selected period and is binary.** One column per week of the
+period, each day trained or not; set counts deliberately do not shade it (owner decision). The
+server builds its days from *finished workouts* over the same Monday-start window as the overview
+(`LocalMidnightUtc`), not from sets — otherwise a workout finished without a ticked working set is
+counted in the Workouts tile but missing from the calendar.
+
+**The hard-sets band is 4-8 sets a week**, an owner choice rather than the 10-20 of the training
+literature, so the copy under the chart states the range without claiming research behind it. The
+bar scale is fixed at 1.5x the band's top so the band sits in the same place on every row.
 
 **Npgsql only binds `timestamptz` parameters at zero offset.** Any `DateTimeOffset` reaching a
 query needs `.ToUniversalTime()`. This threw at runtime twice during the build — once in the stats
@@ -171,7 +195,8 @@ which reads as a glitch on a data page.
 **Chart colours are validated, not chosen.** The categorical pair and the sequential ramp in
 `styles/viz.css` were run through a contrast and colour-vision validator against this app's own
 light *and* dark surfaces. If you change them, re-validate rather than eyeballing — three of the
-checks are not judgeable by eye.
+checks are not judgeable by eye. The binary calendar uses only the ramp's strongest step
+(`--heat-4`), for the most contrast against an empty day in both themes.
 
 ---
 
@@ -202,6 +227,12 @@ routine editor, dashboard, per-exercise stats. No console errors.
 Three bugs were found by *looking* at the running app that reading the code would not have caught:
 stale header totals, chart bars touching at phone width, and the mid-typing overwrite. Worth
 repeating the technique on the next change.
+
+The October round of changes (focus workout screen, carry-over, rest controls, stats periods) was
+verified the same way, change by change, with throwaway Playwright scripts against the dev servers.
+That is how four more surfaced: the sheet stealing focus from the notes field mid-rest, the
+calendar disagreeing with the Workouts tile, the active-workout query resolving to `undefined` when
+none is open, and the Balance card butting against the grid above it.
 
 ---
 
@@ -269,9 +300,14 @@ cd src/web && npx tsc --noEmit -p tsconfig.app.json && npx oxlint src
 
 **Schema changes** need `dotnet ef migrations add <Name> -o Data/Migrations`. Migrations apply
 automatically at startup, so a deploy needs no separate step — which also means a bad migration
-takes the app down with it.
+takes the app down with it. A running `dotnet run` locks the build output on Windows; stop it before
+adding a migration or building.
+
+**Browser-test scripts and the login limit.** Login allows 8 attempts per 15 minutes per client, and
+a script that signs in on every run spends that fast. Sign in once with a direct request to `:5199`
+and hand the `rt_session` cookie to the browser context instead.
 
 ### Local state right now
 
-The compose Postgres is still running and holds the demo account plus a workout left open by the
-browser tests. `docker compose down -v` resets it; re-run `seed-demo` afterwards.
+The compose Postgres is still running and holds the demo account, with no workout open (the last
+one was finished on 2026-10-19). `docker compose down -v` resets it; re-run `seed-demo` afterwards.
