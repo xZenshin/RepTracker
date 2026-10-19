@@ -190,6 +190,22 @@ function ExerciseFocus({
 }) {
   const previous = exercise.previous
   const fields = fieldsFor(exercise.modality, units, weightStep)
+  const updateSet = useUpdateSet(workoutId)
+
+  // The first time at an exercise there is no last time to lay the rows out from, so they start
+  // empty. Once a set is logged, copy it into the empty rows after it: the next set is usually the
+  // same, and ticking a blank row would otherwise log nothing. Rows that already hold numbers -
+  // typed in, or carried over from last time - are never touched.
+  function logged(index: number, values: SetValues) {
+    onLogged()
+    if (previous || !hasValues(values)) return
+
+    for (const set of exercise.sets.slice(index + 1)) {
+      if (!set.isCompleted && !hasValues(set)) {
+        updateSet.mutate({ weId: exercise.id, setId: set.id, ...values })
+      }
+    }
+  }
 
   return (
     <section className="focus">
@@ -203,7 +219,7 @@ function ExerciseFocus({
           : 'First time logging this'}
       </p>
 
-      <LogSetCard workoutId={workoutId} exercise={exercise} units={units} fields={fields} onLogged={onLogged} />
+      <LogSetCard workoutId={workoutId} exercise={exercise} units={units} fields={fields} onLogged={logged} />
 
       {exercise.sets.length > 0 ? (
         <div className="set-grid" role="table">
@@ -226,7 +242,7 @@ function ExerciseFocus({
               modality={exercise.modality}
               units={units}
               fields={fields}
-              onCompleted={onLogged}
+              onCompleted={(values) => logged(i, values)}
             />
           ))}
         </div>
@@ -246,7 +262,8 @@ function LogSetCard({
   exercise: WorkoutExercise
   units: Units
   fields: FieldSpec[]
-  onLogged: () => void
+  /** With the set's position and the values it was logged with. */
+  onLogged: (index: number, values: SetValues) => void
 }) {
   const addSet = useAddSet(workoutId)
   const updateSet = useUpdateSet(workoutId)
@@ -272,7 +289,7 @@ function LogSetCard({
     const parsed = parseInputs(values.primary, values.secondary, exercise.modality, units)
     if (target) updateSet.mutate({ weId: exercise.id, setId: target.id, ...parsed, isCompleted: true })
     else addSet.mutate({ weId: exercise.id, ...parsed, isCompleted: true })
-    onLogged()
+    onLogged(setNumber - 1, parsed)
   }
 
   return (
@@ -334,7 +351,7 @@ function SetRow({
   modality: Modality
   units: Units
   fields: FieldSpec[]
-  onCompleted: () => void
+  onCompleted: (values: SetValues) => void
 }) {
   const update = useUpdateSet(workoutId)
   const remove = useDeleteSet(workoutId)
@@ -355,14 +372,15 @@ function SetRow({
   }, [set, modality, units])
 
   function commit(extra?: { isCompleted?: boolean }) {
-    const payload = { weId, setId: set.id, ...parseInputs(primary, secondary, modality, units), ...extra }
-    update.mutate(payload)
+    const values = parseInputs(primary, secondary, modality, units)
+    update.mutate({ weId, setId: set.id, ...values, ...extra })
+    return values
   }
 
   function toggleComplete() {
     const next = !set.isCompleted
-    commit({ isCompleted: next })
-    if (next) onCompleted()
+    const values = commit({ isCompleted: next })
+    if (next) onCompleted(values)
   }
 
   const values = { primary, secondary }
@@ -846,6 +864,9 @@ function secondaryValue(set: Partial<WorkoutSet>, modality: Modality): string {
   if (modality === 'DistanceDuration') return set.durationSeconds ? formatDuration(set.durationSeconds) : ''
   return set.reps != null ? String(set.reps) : ''
 }
+
+/** A set's values as entered, parsed into what the API stores. */
+type SetValues = ReturnType<typeof parseInputs>
 
 function parseInputs(primary: string, secondary: string, modality: Modality, units: Units) {
   if (modality === 'Duration') {
