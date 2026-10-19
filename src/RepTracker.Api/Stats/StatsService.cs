@@ -38,10 +38,7 @@ public class StatsService(AppDb db)
         var now = DateTimeOffset.UtcNow;
         var currentWeek = WeekStartOf(now, offsetMinutes);
         var firstWeek = currentWeek.AddDays(-7 * (weeks - 1));
-        // The window starts at local midnight on that Monday, converted to UTC: Npgsql only binds
-        // timestamptz parameters with a zero offset.
-        var since = new DateTimeOffset(firstWeek.ToDateTime(TimeOnly.MinValue), TimeSpan.FromMinutes(offsetMinutes))
-            .ToUniversalTime();
+        var since = LocalMidnightUtc(firstWeek, offsetMinutes);
 
         var workouts = await AllWorkoutsAsync(userId, ct);
         var windowSets = await WorkingSetsAsync(userId, since, ct);
@@ -61,20 +58,35 @@ public class StatsService(AppDb db)
             await NeglectedAsync(userId, perExercise, now, ct));
     }
 
+    /// <summary>
+    /// One entry per day with a finished workout, over the same Monday-start window as the
+    /// overview. Days come from workouts rather than sets so the calendar marks exactly the
+    /// workouts the overview counts - including one finished without a ticked working set.
+    /// </summary>
     public async Task<List<CalendarDayDto>> CalendarAsync(
         Guid userId, decimal? bodyWeightKg, int weeks, int offsetMinutes, CancellationToken ct)
     {
-        var since = DateTimeOffset.UtcNow.AddDays(-7 * weeks);
-        var sets = await WorkingSetsAsync(userId, since, ct);
+        var firstWeek = WeekStartOf(DateTimeOffset.UtcNow, offsetMinutes).AddDays(-7 * (weeks - 1));
+        var since = LocalMidnightUtc(firstWeek, offsetMinutes);
 
-        return [.. sets
+        var workouts = await db.Workouts
+            .Where(w => w.UserId == userId && w.FinishedAt != null && w.StartedAt >= since)
+            .Select(w => w.StartedAt)
+            .ToListAsync(ct);
+
+        var setsByDay = (await WorkingSetsAsync(userId, since, ct))
             .GroupBy(s => LocalDate(s.StartedAt, offsetMinutes))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        return [.. workouts
+            .GroupBy(startedAt => LocalDate(startedAt, offsetMinutes))
             .OrderBy(g => g.Key)
-            .Select(g => new CalendarDayDto(
-                g.Key,
-                g.Select(s => s.WorkoutId).Distinct().Count(),
-                Math.Round(g.Sum(s => Volume(s, bodyWeightKg)), 1),
-                g.Count()))];
+            .Select(g =>
+            {
+                var sets = setsByDay.GetValueOrDefault(g.Key) ?? [];
+                return new CalendarDayDto(
+                    g.Key, g.Count(), Math.Round(sets.Sum(s => Volume(s, bodyWeightKg)), 1), sets.Count);
+            })];
     }
 
     /// <summary>Every exercise the user has actually trained, for the picker on the stats page.</summary>
@@ -486,6 +498,13 @@ public class StatsService(AppDb db)
 
     private static decimal? OneRepMax(SetRow s, decimal? bodyWeightKg) =>
         Formulas.EstimatedOneRepMax(Load(s, bodyWeightKg), s.Reps);
+
+    /// <summary>
+    /// Local midnight on a date, converted to UTC: Npgsql only binds timestamptz parameters with a
+    /// zero offset, so every window start goes through here.
+    /// </summary>
+    private static DateTimeOffset LocalMidnightUtc(DateOnly date, int offsetMinutes) =>
+        new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromMinutes(offsetMinutes)).ToUniversalTime();
 
     private static DateOnly LocalDate(DateTimeOffset utc, int offsetMinutes) =>
         DateOnly.FromDateTime(utc.ToOffset(TimeSpan.FromMinutes(offsetMinutes)).DateTime);

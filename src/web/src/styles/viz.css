@@ -170,8 +170,11 @@
   scrollbar-width: thin;
 }
 
+/* Centred in the card; once it is wider than the card the auto margins fall to zero and the
+   scroller takes over. */
 .heatmap-wrap {
   width: max-content;
+  margin: 0 auto;
 }
 
 .heatmap-months {
@@ -211,6 +214,7 @@
 .heat-legend {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   margin-top: 10px;
   font-size: 0.74rem;

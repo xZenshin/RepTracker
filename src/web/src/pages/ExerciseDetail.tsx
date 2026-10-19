@@ -12,9 +12,9 @@ import '../styles/viz.css'
 import './workout-detail.css'
 
 const PERIODS = [
-  { weeks: 12, label: '12w' },
-  { weeks: 26, label: '6m' },
-  { weeks: 52, label: '1y' },
+  { weeks: 13, label: '3M' },
+  { weeks: 26, label: '6M' },
+  { weeks: 52, label: '12M' },
   { weeks: 156, label: 'All' },
 ]
 

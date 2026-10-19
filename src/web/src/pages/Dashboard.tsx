@@ -10,15 +10,18 @@ import { formatHours, formatRelative, isoDate } from '../lib/time'
 import { AlertIcon, FlameIcon, TrophyIcon } from '../components/Icons'
 import '../styles/viz.css'
 
+// Months for the reader, whole weeks underneath: every statistic here buckets by Monday-start week,
+// so each period is the nearest whole number of weeks.
 const PERIODS = [
-  { weeks: 8, label: '8w' },
-  { weeks: 12, label: '12w' },
-  { weeks: 26, label: '6m' },
-  { weeks: 52, label: '1y' },
+  { weeks: 4, label: '1M', span: 'Last month' },
+  { weeks: 13, label: '3M', span: 'Last 3 months' },
+  { weeks: 26, label: '6M', span: 'Last 6 months' },
+  { weeks: 52, label: '12M', span: 'Last 12 months' },
 ]
 
 export default function Dashboard() {
-  const [weeks, setWeeks] = useState(12)
+  const [weeks, setWeeks] = useState(13)
+  const period = PERIODS.find((p) => p.weeks === weeks) ?? PERIODS[1]
   const { data, isPending } = useOverview(weeks)
   const { data: user } = useMe()
   const units = user?.units ?? 'kg'
@@ -76,16 +79,16 @@ export default function Dashboard() {
             <div className="tile">
               <div className="label">Time under the bar</div>
               <div className="value">{formatHours(data.totals.durationSeconds)}</div>
-              <div className="foot">across {weeks} weeks</div>
+              <div className="foot">{period.span.toLowerCase()}</div>
             </div>
           </section>
 
           <section className="card">
             <div className="card-title">
               <h2>Consistency</h2>
-              <span className="hint">Last 12 months</span>
+              <span className="hint">{period.span}</span>
             </div>
-            <Heatmap />
+            <Heatmap weeks={weeks} />
           </section>
 
           <section className="card">
@@ -356,22 +359,25 @@ function BalanceBars({ balance }: { balance: import('../api/types').Balance }) {
   )
 }
 
-function Heatmap() {
-  const { data: days, isPending } = useCalendar()
+/** The same period as the rest of the page: one column per week, ending with the current one. */
+function Heatmap({ weeks: weekCount }: { weeks: number }) {
+  const { data: days, isPending } = useCalendar(weekCount)
 
   if (isPending) return <div className="skeleton" style={{ height: 110 }} />
 
   const byDate = new Map((days ?? []).map((day) => [day.date, day]))
-  const weeks = buildCalendarGrid(byDate)
+  const weeks = buildCalendarGrid(byDate, weekCount)
 
   // A label on the first column of each month; without them a year of squares is unnavigable.
-  const months = weeks
-    .map((week, index) => ({ index, date: new Date(week[0].date) }))
-    .filter((entry, i, all) => i === 0 || entry.date.getMonth() !== all[i - 1].date.getMonth())
-    .map((entry) => ({
-      index: entry.index,
-      label: entry.date.toLocaleDateString(undefined, { month: 'short' }),
-    }))
+  // A label needs two columns of room, so when a month starts right after the previous label -
+  // only possible at the very start of the range - the new month's label replaces it.
+  const months: { index: number; label: string }[] = []
+  weeks.forEach((week, index) => {
+    const date = new Date(week[0].date)
+    if (index > 0 && date.getMonth() === new Date(weeks[index - 1][0].date).getMonth()) return
+    if (months.length > 0 && index - months[months.length - 1].index < 2) months.pop()
+    months.push({ index, label: date.toLocaleDateString(undefined, { month: 'short' }) })
+  })
 
   return (
     <>
@@ -411,11 +417,11 @@ interface Cell {
 }
 
 /**
- * Whole weeks of seven days, Monday-first, covering the last year and ending with the current week.
- * Each day is simply trained or not: consistency is about showing up, so a short session counts
- * the same as a long one.
+ * `weekCount` whole weeks of seven days, Monday-first, ending with the current week. Each day is
+ * simply trained or not: consistency is about showing up, so a short session counts the same as
+ * a long one.
  */
-function buildCalendarGrid(byDate: Map<string, CalendarDay>): Cell[][] {
+function buildCalendarGrid(byDate: Map<string, CalendarDay>, weekCount: number): Cell[][] {
   const today = new Date()
   today.setHours(12, 0, 0, 0)
 
@@ -424,7 +430,7 @@ function buildCalendarGrid(byDate: Map<string, CalendarDay>): Cell[][] {
   end.setDate(end.getDate() + (7 - ((end.getDay() + 6) % 7) - 1))
 
   const start = new Date(end)
-  start.setDate(start.getDate() - 52 * 7 - 6)
+  start.setDate(start.getDate() - weekCount * 7 + 1)
 
   const weeks: Cell[][] = []
   for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {

@@ -14,7 +14,7 @@ export const keys = {
   workouts: ['workouts', 'history'] as const,
   workout: (id: string) => ['workouts', id] as const,
   overview: (weeks: number) => ['stats', 'overview', weeks] as const,
-  calendar: ['stats', 'calendar'] as const,
+  calendar: (weeks: number) => ['stats', 'calendar', weeks] as const,
   statExercises: ['stats', 'exercises'] as const,
   statExercise: (id: string, weeks: number) => ['stats', 'exercises', id, weeks] as const,
 }
@@ -325,10 +325,10 @@ export function useOverview(weeks: number) {
   })
 }
 
-export function useCalendar() {
+export function useCalendar(weeks: number) {
   return useQuery({
-    queryKey: keys.calendar,
-    queryFn: () => api<CalendarDay[]>(`/stats/calendar?weeks=53&offsetMinutes=${utcOffsetMinutes()}`),
+    queryKey: keys.calendar(weeks),
+    queryFn: () => api<CalendarDay[]>(`/stats/calendar?weeks=${weeks}&offsetMinutes=${utcOffsetMinutes()}`),
   })
 }
 
