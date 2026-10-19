@@ -46,7 +46,6 @@ export function useRestTimer(): RestTimer {
     if (firedRef.current) return
 
     firedRef.current = true
-    alertRestOver()
 
     // Leave the finished timer on screen briefly so it registers, then clear it.
     const id = window.setTimeout(() => {
@@ -114,41 +113,4 @@ function readStored(): number | null {
   }
 }
 
-/**
- * Two short tones and a buzz. Headphones are usually in, so sound carries better than anything
- * visual, and the vibration covers the case where they are not.
- */
-function alertRestOver() {
-  try {
-    navigator.vibrate?.([180, 90, 180])
-  } catch {
-    // Unsupported on desktop; the tone still plays.
-  }
 
-  try {
-    const AudioContextClass =
-      window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (!AudioContextClass) return
-
-    const context = new AudioContextClass()
-    const play = (at: number) => {
-      const oscillator = context.createOscillator()
-      const gain = context.createGain()
-      oscillator.type = 'sine'
-      oscillator.frequency.value = 880
-      // A short envelope rather than a hard stop, which would click.
-      gain.gain.setValueAtTime(0.0001, context.currentTime + at)
-      gain.gain.exponentialRampToValueAtTime(0.35, context.currentTime + at + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + at + 0.22)
-      oscillator.connect(gain).connect(context.destination)
-      oscillator.start(context.currentTime + at)
-      oscillator.stop(context.currentTime + at + 0.24)
-    }
-
-    play(0)
-    play(0.3)
-    setTimeout(() => void context.close(), 1200)
-  } catch {
-    // Audio can be blocked until the page has been interacted with. The vibration stands in.
-  }
-}
