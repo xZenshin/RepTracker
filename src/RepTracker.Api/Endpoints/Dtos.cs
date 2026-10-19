@@ -6,8 +6,10 @@ namespace RepTracker.Api.Endpoints;
 public record RegisterRequest(string? DisplayName, string? SignupCode);
 public record RegisterResponse(string LoginCode, string Formatted, UserDto User);
 public record LoginRequest(string Code);
-public record UserDto(Guid Id, string? DisplayName, string Units, decimal? BodyWeightKg, DateTimeOffset CreatedAt);
-public record UpdateUserRequest(string? DisplayName, string? Units, decimal? BodyWeightKg);
+public record UserDto(
+    Guid Id, string? DisplayName, string Units, decimal? BodyWeightKg, decimal? WeightStepKg, DateTimeOffset CreatedAt);
+/// <summary>A WeightStepKg of 0 or less clears it back to the default for the user's units.</summary>
+public record UpdateUserRequest(string? DisplayName, string? Units, decimal? BodyWeightKg, decimal? WeightStepKg);
 
 // ---- exercises ----
 public record ExerciseDto(

@@ -42,6 +42,15 @@ export function unitLabel(units: Units) {
 }
 
 /** Plate-friendly steps: 2.5 kg is the smallest pair of plates, 5 lb the imperial equivalent. */
-export function weightStep(units: Units) {
+export function defaultWeightStep(units: Units) {
   return units === 'lb' ? 5 : 2.5
+}
+
+/**
+ * What + and - add to a weight while logging, in display units: the user's own step if they set
+ * one in Settings, otherwise the default. Rounded so a 5 lb step stored as 2.268 kg reads as 5.
+ */
+export function weightStep(units: Units, customKg: number | null | undefined) {
+  const custom = toDisplay(customKg, units)
+  return custom === null ? defaultWeightStep(units) : Math.round(custom * 100) / 100
 }

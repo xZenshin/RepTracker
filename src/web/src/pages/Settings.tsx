@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDeleteAccount, useLogout, useMe, useUpdateMe } from '../api/hooks'
 import type { Units } from '../api/types'
-import { toDisplay, toKg } from '../lib/units'
+import { defaultWeightStep, toDisplay, toKg, weightStep } from '../lib/units'
 import { formatDateFull } from '../lib/time'
 import { AlertIcon } from '../components/Icons'
 
@@ -19,6 +19,9 @@ export default function Settings() {
     const value = toDisplay(user?.bodyWeightKg, units)
     return value === null ? '' : String(Math.round(value * 10) / 10)
   })
+  // Only held while typing. Otherwise the field shows the saved step in the current units, so
+  // switching kg/lb never leaves a stale number sitting under the new unit label.
+  const [stepDraft, setStepDraft] = useState<string | null>(null)
 
   if (!user) return null
 
@@ -70,7 +73,7 @@ export default function Settings() {
           </p>
         </div>
 
-        <label className="field" style={{ marginBottom: 0 }}>
+        <label className="field">
           <span className="label">Bodyweight ({units})</span>
           <input
             className="input"
@@ -87,6 +90,34 @@ export default function Settings() {
           <p className="help">
             Used to give pull-ups, dips and push-ups a real load. Without it those sets count as
             zero volume and no strength estimate.
+          </p>
+        </label>
+
+        <label className="field" style={{ marginBottom: 0 }}>
+          <span className="label">Weight step ({units})</span>
+          <input
+            className="input"
+            type="number"
+            step="any"
+            min="0"
+            value={stepDraft ?? (user.weightStepKg == null ? '' : String(weightStep(units, user.weightStepKg)))}
+            onChange={(event) => setStepDraft(event.target.value)}
+            onBlur={() => {
+              if (stepDraft === null) return
+              setStepDraft(null)
+              const parsed = Number(stepDraft)
+              if (stepDraft.trim() === '' || parsed <= 0) {
+                // Empty means "back to the default"; the API reads 0 as that.
+                if (user.weightStepKg != null) update.mutate({ weightStepKg: 0 })
+              } else if (!Number.isNaN(parsed) && parsed !== weightStep(units, user.weightStepKg)) {
+                update.mutate({ weightStepKg: toKg(parsed, units) ?? 0 })
+              }
+            }}
+            placeholder={`Default: ${defaultWeightStep(units)}`}
+          />
+          <p className="help">
+            How much + and - change the weight while logging a set. Leave empty for the default
+            ({defaultWeightStep(units)} {units}).
           </p>
         </label>
       </section>

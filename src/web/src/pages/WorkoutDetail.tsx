@@ -3,6 +3,7 @@ import { useDeleteWorkout, useMe, useWorkout } from '../api/hooks'
 import type { Modality, Units, WorkoutSet } from '../api/types'
 import { formatDateFull, formatDuration, formatTime } from '../lib/time'
 import { formatVolume, formatWeight } from '../lib/units'
+import { useIsDesktop } from '../lib/useMediaQuery'
 import { BackIcon, TrashIcon } from '../components/Icons'
 import './workout-detail.css'
 
@@ -12,6 +13,8 @@ export default function WorkoutDetail() {
   const { data: workout, isPending, isError } = useWorkout(id)
   const { data: user } = useMe()
   const remove = useDeleteWorkout()
+  // Stats routes don't exist on a phone, so a link there would just bounce back to Train.
+  const isDesktop = useIsDesktop()
 
   const units = user?.units ?? 'kg'
 
@@ -70,7 +73,7 @@ export default function WorkoutDetail() {
         <section key={we.id} className="card detail-exercise">
           <div className="card-title">
             <h2>
-              <Link to={`/stats/${we.exerciseId}`}>{we.exerciseName}</Link>
+              {isDesktop ? <Link to={`/stats/${we.exerciseId}`}>{we.exerciseName}</Link> : we.exerciseName}
             </h2>
             <span className="hint">{we.muscleGroup}</span>
           </div>

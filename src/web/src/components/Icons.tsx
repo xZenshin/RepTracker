@@ -107,3 +107,39 @@ export const CopyIcon = (p: Props) => (
     <path d="M5 15V6a2 2 0 0 1 2-2h8" />
   </svg>
 )
+
+export const MinusCircleIcon = (p: Props) => (
+  <svg {...base} {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 12h8" />
+  </svg>
+)
+
+export const PlusCircleIcon = (p: Props) => (
+  <svg {...base} {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 12h8M12 8v8" />
+  </svg>
+)
+
+/** Two filled chevrons: jump to the next item. Mirror it with a CSS flip for "previous". */
+export const SkipIcon = (p: Props) => (
+  <svg {...base} {...p} fill="currentColor" strokeWidth={1.2}>
+    <path d="M3 6.5v11l8-5.5-8-5.5ZM12 6.5v11l8-5.5-8-5.5Z" />
+  </svg>
+)
+
+export const ListIcon = (p: Props) => (
+  <svg {...base} {...p}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+    <path d="M14 3v5h5M9 13h6M9 17h4" />
+  </svg>
+)
+
+export const MoreIcon = (p: Props) => (
+  <svg {...base} {...p} fill="currentColor" stroke="none">
+    <circle cx="5" cy="12" r="1.9" />
+    <circle cx="12" cy="12" r="1.9" />
+    <circle cx="19" cy="12" r="1.9" />
+  </svg>
+)

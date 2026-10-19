@@ -92,7 +92,13 @@ export function useLogout() {
 export function useUpdateMe() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: { displayName?: string | null; units?: Units; bodyWeightKg?: number | null }) =>
+    mutationFn: (body: {
+      displayName?: string | null
+      units?: Units
+      bodyWeightKg?: number | null
+      /** 0 resets to the default for the user's units. */
+      weightStepKg?: number
+    }) =>
       api<User>('/auth/me', { method: 'PATCH', body }),
     onSuccess: (user) => {
       qc.setQueryData(keys.me, user)

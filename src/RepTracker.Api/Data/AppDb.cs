@@ -19,6 +19,8 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
         {
             e.HasIndex(x => x.LoginCodeHmac).IsUnique();
             e.Property(x => x.BodyWeightKg).HasPrecision(6, 2);
+            // Three places so a 5 lb step survives the round trip through kilograms as 5, not 5.01.
+            e.Property(x => x.WeightStepKg).HasPrecision(5, 3);
         });
 
         b.Entity<Session>(e =>

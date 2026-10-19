@@ -1,7 +1,8 @@
 import { Suspense, lazy, useState, type ReactNode } from 'react'
-import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { NavLink, Navigate, Route, Routes, useMatch, useNavigate } from 'react-router-dom'
 import { useActiveWorkout, useMe } from './api/hooks'
 import { ChartIcon, DumbbellIcon, HistoryIcon, SettingsIcon } from './components/Icons'
+import { useIsDesktop } from './lib/useMediaQuery'
 import Login, { CodeIssued } from './pages/Login'
 import Train from './pages/Train'
 import ActiveWorkout from './pages/ActiveWorkout'
@@ -18,6 +19,8 @@ const ExerciseDetail = lazy(() => import('./pages/ExerciseDetail'))
 export default function App() {
   const { data: user, isPending } = useMe()
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
+  const inWorkout = useMatch('/workout') !== null
 
   // Registering signs you in as a side effect, so `user` is already set by the time the code
   // screen would render. It therefore has to live above this gate rather than inside Login -
@@ -42,7 +45,7 @@ export default function App() {
   if (!user) return <Login onIssued={setIssuedCode} />
 
   return (
-    <div className="app">
+    <div className={`app${inWorkout ? ' focus-mode' : ''}`}>
       <Nav />
       <Routes>
         <Route path="/" element={<Train />} />
@@ -51,8 +54,13 @@ export default function App() {
         <Route path="/routines/:id" element={<RoutineEditor />} />
         <Route path="/history" element={<History />} />
         <Route path="/history/:id" element={<WorkoutDetail />} />
-        <Route path="/stats" element={<Lazy><Dashboard /></Lazy>} />
-        <Route path="/stats/:exerciseId" element={<Lazy><ExerciseDetail /></Lazy>} />
+        {/* Stats are desktop-only: on a phone the app is for logging the workout in front of you.
+            The guard sits above Lazy so a phone never downloads the charting chunk at all. */}
+        <Route path="/stats" element={isDesktop ? <Lazy><Dashboard /></Lazy> : <Navigate to="/" replace />} />
+        <Route
+          path="/stats/:exerciseId"
+          element={isDesktop ? <Lazy><ExerciseDetail /></Lazy> : <Navigate to="/" replace />}
+        />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -77,6 +85,7 @@ function Lazy({ children }: { children: ReactNode }) {
 
 function Nav() {
   const { data: active } = useActiveWorkout()
+  const isDesktop = useIsDesktop()
 
   return (
     <nav className="nav">
@@ -94,10 +103,12 @@ function Nav() {
         <HistoryIcon />
         History
       </NavLink>
-      <NavLink to="/stats">
-        <ChartIcon />
-        Stats
-      </NavLink>
+      {isDesktop ? (
+        <NavLink to="/stats">
+          <ChartIcon />
+          Stats
+        </NavLink>
+      ) : null}
       <NavLink to="/settings">
         <SettingsIcon />
         Settings

@@ -8,6 +8,8 @@ export interface User {
   displayName?: string | null
   units: Units
   bodyWeightKg?: number | null
+  /** Null means the default for the user's units; see weightStep() in lib/units. */
+  weightStepKg?: number | null
   createdAt: string
 }
 

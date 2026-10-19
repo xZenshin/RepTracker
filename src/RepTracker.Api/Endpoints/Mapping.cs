@@ -6,7 +6,7 @@ namespace RepTracker.Api.Endpoints;
 public static class Mapping
 {
     public static UserDto ToDto(this User u) =>
-        new(u.Id, u.DisplayName, u.Units, u.BodyWeightKg, u.CreatedAt);
+        new(u.Id, u.DisplayName, u.Units, u.BodyWeightKg, u.WeightStepKg, u.CreatedAt);
 
     public static ExerciseDto ToDto(this Exercise e) =>
         new(e.Id, e.Name, e.MuscleGroup, e.Equipment, e.Modality, e.Pattern, e.UserId is not null, e.IsArchived);

@@ -100,6 +100,7 @@ public static class AuthEndpoints
         if (body.DisplayName is not null) user.DisplayName = Validation.Text(body.DisplayName, 40);
         if (body.Units is not null) user.Units = Validation.OneOf(body.Units, ["kg", "lb"], "kg");
         if (body.BodyWeightKg is not null) user.BodyWeightKg = Validation.BodyWeight(body.BodyWeightKg);
+        if (body.WeightStepKg is not null) user.WeightStepKg = Validation.WeightStep(body.WeightStepKg.Value);
 
         await db.SaveChangesAsync(ct);
         return Results.Ok(user.ToDto());

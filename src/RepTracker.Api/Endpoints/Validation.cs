@@ -23,6 +23,9 @@ public static class Validation
     public static decimal? Rpe(decimal? rpe) => Clamp(rpe, 1m, 10m, 1);
     public static decimal? BodyWeight(decimal? kg) => Clamp(kg, 20m, 500m, 2);
 
+    /// <summary>Zero or less means "back to the default"; otherwise a tenth of a kilo up to 50.</summary>
+    public static decimal? WeightStep(decimal kg) => kg <= 0 ? null : Clamp(kg, 0.1m, 50m, 3);
+
     public static int? Reps(int? reps) => reps is null ? null : Math.Clamp(reps.Value, 0, 1000);
     public static int? Duration(int? seconds) => seconds is null ? null : Math.Clamp(seconds.Value, 0, 86_400);
     public static int Rest(int seconds) => Math.Clamp(seconds, 0, 3600);

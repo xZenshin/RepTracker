@@ -98,7 +98,9 @@ request runs the session handler and hits the database. Moving `UseStaticFiles` 
 `Program.cs` silently reintroduces that. The ordering is load-bearing.
 
 **Weight is stored in kilograms everywhere** — database, API, and every statistic. kg/lb is a
-display conversion in `lib/units.ts`. Switching units never rewrites history.
+display conversion in `lib/units.ts`. Switching units never rewrites history. The user's weight
+step (`User.WeightStepKg`, Settings) follows the same rule, at three decimal places so a 5 lb step
+round-trips as 5; null means the per-unit default in `lib/units.ts`.
 
 **One active workout per user is enforced by a partial unique index**
 (`IX_Workouts_OneActivePerUser`), not just by the handler's check. A double-tapped "Start" races
@@ -109,9 +111,15 @@ past the check; `WorkoutEndpoints.Start` catches the resulting `DbUpdateExceptio
 edits are written straight into the query cache to stop the row flickering under your thumb, which
 leaves the server's totals a step behind. **If you change a volume rule, change it in both files.**
 
-**Both editors avoid effect-based state sync.** `SetRow` skips its re-sync while one of its own
-inputs holds focus; `RoutineEditor` seeds during render against the loaded routine's id. Both guard
-the same bug: a refetch landing mid-edit replacing a value under the cursor. This is routine on a
+**The live workout shows one exercise at a time.** The big steppers (`LogSetCard`) edit the next
+unticked set, or a new one once the plan runs out, and the tick writes and completes it in one
+request. Which exercise is on screen lives in `sessionStorage` (`rt.current-exercise`), like the
+rest timer, so a reload lands back on it. On a phone the tab bar is hidden on `/workout`
+(`.app.focus-mode`); Back is the way out.
+
+**The editors avoid effect-based state sync.** `SetRow` skips its re-sync while one of its own
+inputs holds focus; `RoutineEditor` and `LogSetCard` seed during render against the id of what they
+are editing. All guard the same bug: a refetch landing mid-edit replacing a value under the cursor. This is routine on a
 phone, where tabbing away and back triggers a refetch.
 
 **Never call `queryClient.clear()` to sign out.** It removes the query objects that mounted
@@ -142,6 +150,13 @@ clamps it to ±840. Weeks start Monday.
 query needs `.ToUniversalTime()`. This threw at runtime twice during the build — once in the stats
 window, once on the history cursor. Both are fixed and commented; the trap is still live for new
 queries.
+
+**Stats are desktop-only.** An owner decision (2026-10-19): on a phone the app is for logging the
+workout in front of you. Below 900px the Stats tab is not rendered and `/stats*` redirects to `/`;
+workout detail renders exercise names as plain text rather than as links into stats. The 900px
+value lives twice — `useIsDesktop` in `lib/useMediaQuery.ts` and the nav breakpoint in
+`styles/theme.css` — so change both together. The route guard sits *above* `Lazy` on purpose, so a
+phone never downloads the Recharts chunk.
 
 **Recharts animation is off everywhere.** It replays on every filter change and every resize,
 which reads as a glitch on a data page.
@@ -205,7 +220,8 @@ Ordered by what to fix first.
 7. **Workout exercises cannot be reordered from the UI.** `PUT .../exercises/order` exists and
    works; nothing calls it.
 8. **The catalogue is English-only and has no i18n**, as is all UI copy.
-9. **Bundle is ~105 KB gzip initial**, with Recharts (~107 KB) split into the stats routes.
+9. **Bundle is ~105 KB gzip initial**, with Recharts (~107 KB) split into the stats routes — which
+   phones never load, since stats are desktop-only.
 
 ---
 

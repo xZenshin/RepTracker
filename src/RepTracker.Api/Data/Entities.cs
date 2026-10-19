@@ -28,6 +28,12 @@ public class User
     /// <summary>Used to give bodyweight movements a real load in volume and e1RM maths.</summary>
     public decimal? BodyWeightKg { get; set; }
 
+    /// <summary>
+    /// What one tap of + or - adds to a weight while logging a set. Null means the default for the
+    /// user's units (2.5 kg / 5 lb). Kilograms like every other weight, converted for display.
+    /// </summary>
+    public decimal? WeightStepKg { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset LastSeenAt { get; set; }
 

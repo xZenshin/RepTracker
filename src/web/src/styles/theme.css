@@ -212,6 +212,11 @@ textarea {
   height: 22px;
 }
 
+/* On a phone the live workout takes the whole screen; its Back button returns to the tabs. */
+.app.focus-mode .nav {
+  display: none;
+}
+
 /* A dot on the Train tab whenever a workout is still open, so it cannot be forgotten. */
 .nav .live-dot {
   position: absolute;
@@ -243,6 +248,10 @@ textarea {
     border-top: none;
     border-right: 1px solid var(--border);
     backdrop-filter: none;
+  }
+
+  .app.focus-mode .nav {
+    display: flex;
   }
 
   .nav a {

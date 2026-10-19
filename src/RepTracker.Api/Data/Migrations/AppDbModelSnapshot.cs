@@ -216,6 +216,10 @@ namespace RepTracker.Api.Data.Migrations
                         .HasMaxLength(2)
                         .HasColumnType("character varying(2)");
 
+                    b.Property<decimal?>("WeightStepKg")
+                        .HasPrecision(5, 3)
+                        .HasColumnType("numeric(5,3)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("LoginCodeHmac")
