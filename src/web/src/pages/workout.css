@@ -5,7 +5,7 @@
 
 /* Doubled class: theme.css can load after this file, and its .page rules must not win. */
 .page.workout-page {
-  --dock-height: 172px;
+  --dock-height: 192px;
   max-width: 600px;
   /* Clears the fixed dock. */
   padding-bottom: calc(var(--dock-height) + 24px + env(safe-area-inset-bottom));
@@ -415,10 +415,73 @@
   color: var(--success);
 }
 
+.dock-side-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+
+.dock-side-text b {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.dock-side-text small {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/*
+  Rest adjustments flank the progress line while a rest runs. The row keeps its height either way,
+  so the dock does not jump when a timer starts.
+*/
+.dock-rest-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--touch);
+  margin: 6px 0;
+}
+
+.rest-adjust {
+  min-width: 68px;
+  height: var(--touch);
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  transition: background 0.12s ease, transform 0.06s ease;
+}
+
+.rest-adjust:hover:not(:disabled) {
+  background: var(--surface);
+}
+
+.rest-adjust:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.rest-adjust:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.dock:not(.resting) .rest-adjust {
+  display: none;
+}
+
 /* Doubles as the rest progress: it fills left to right while a rest counts down. */
 .dock-progress {
+  flex: 1;
   height: 2px;
-  margin: 12px 0 10px;
   border-radius: 2px;
   background: var(--border-strong);
   overflow: hidden;

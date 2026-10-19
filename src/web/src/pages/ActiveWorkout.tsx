@@ -15,7 +15,7 @@ import ExercisePicker from '../components/ExercisePicker'
 import Sheet from '../components/Sheet'
 import {
   BackIcon, CheckIcon, ListIcon, MinusCircleIcon, MoreIcon, PlusCircleIcon, PlusIcon, SkipIcon,
-  TimerIcon, TrashIcon,
+  StopIcon, TimerIcon, TrashIcon,
 } from '../components/Icons'
 import './workout.css'
 
@@ -121,7 +121,6 @@ export default function ActiveWorkout() {
         hasPrev={Boolean(prev)}
         hasNext={Boolean(next)}
         onExercises={() => setSheet('exercises')}
-        onRest={() => setSheet('menu')}
         onPrev={() => prev && select(prev.id)}
         onNext={() => next && select(next.id)}
         onDone={() => (next ? select(next.id) : setSheet('finish'))}
@@ -419,13 +418,19 @@ function SetRow({
   )
 }
 
+/** How much each tap of the rest -/+ buttons moves the countdown. */
+const REST_STEP = 15
+
+/** For starting a rest by hand on an exercise whose automatic timer is off. */
+const FALLBACK_REST = 90
+
 /**
- * The fixed panel at the bottom: the exercise list, a clock, the rest length, and the controls
- * that move between exercises. The clock is the rest countdown while one runs - that is the
- * number you look at between sets - and the workout's elapsed time otherwise.
+ * The fixed panel at the bottom: the exercise list, a clock, rest controls, and the controls that
+ * move between exercises. The clock is the rest countdown while one runs - that is the number you
+ * look at between sets - and the workout's elapsed time otherwise.
  */
 function Dock({
-  workout, current, rest, hasPrev, hasNext, onExercises, onRest, onPrev, onNext, onDone,
+  workout, current, rest, hasPrev, hasNext, onExercises, onPrev, onNext, onDone,
 }: {
   workout: Workout
   current: WorkoutExercise | undefined
@@ -433,7 +438,6 @@ function Dock({
   hasPrev: boolean
   hasNext: boolean
   onExercises: () => void
-  onRest: () => void
   onPrev: () => void
   onNext: () => void
   onDone: () => void
@@ -443,6 +447,7 @@ function Dock({
   const over = rest.remaining === 0
   const total = rest.total ?? rest.remaining ?? 0
   const progress = resting && total > 0 ? 1 - (rest.remaining ?? 0) / total : 0
+  const restLength = current?.restSeconds || FALLBACK_REST
 
   return (
     <div className={`dock${resting ? ' resting' : ''}${over ? ' over' : ''}`}>
@@ -453,34 +458,60 @@ function Dock({
             <span>All<br />exercises</span>
           </button>
 
+          {/* role="timer" rather than a live region: a countdown announced every second is noise. */}
+          <div className="dock-clock" role="timer">
+            <b className="tabular">
+              {resting ? (over ? 'Go' : formatDuration(rest.remaining)) : formatDuration(elapsed)}
+            </b>
+            <span>{resting ? (over ? 'Rest over' : 'Rest') : 'Workout'}</span>
+          </div>
+
           {resting ? (
-            <button className="dock-clock" type="button" onClick={rest.stop} aria-label="Skip rest">
-              <b className="tabular" role="status">{over ? 'Go' : formatDuration(rest.remaining)}</b>
-              <span>{over ? 'Rest over' : 'Rest · tap to skip'}</span>
+            <button className="dock-side end" type="button" onClick={rest.stop} aria-label="Stop rest">
+              <span className="dock-side-text">
+                <b>Stop</b>
+                <small>rest</small>
+              </span>
+              <StopIcon />
             </button>
           ) : (
-            <div className="dock-clock">
-              <b className="tabular">{formatDuration(elapsed)}</b>
-              <span>Workout</span>
-            </div>
+            <button
+              className="dock-side end"
+              type="button"
+              onClick={() => rest.start(restLength)}
+              aria-label={`Start a ${formatDuration(restLength)} rest`}
+            >
+              <span className="dock-side-text">
+                <b className="tabular">{formatDuration(restLength)}</b>
+                <small>Start rest</small>
+              </span>
+              <TimerIcon />
+            </button>
           )}
-
-          <button
-            className="dock-side end"
-            type="button"
-            onClick={onRest}
-            disabled={!current}
-            aria-label="Rest between sets"
-          >
-            <span className="tabular">
-              {current ? (current.restSeconds ? formatDuration(current.restSeconds) : 'Off') : '-'}
-            </span>
-            <TimerIcon />
-          </button>
         </div>
 
-        <div className="dock-progress" aria-hidden>
-          <div style={{ transform: `scaleX(${progress})` }} />
+        <div className="dock-rest-row">
+          <button
+            className="rest-adjust"
+            type="button"
+            // Trimming below zero would just be stopping, which has its own button.
+            disabled={(rest.remaining ?? 0) <= REST_STEP}
+            onClick={() => rest.add(-REST_STEP)}
+            aria-label={`${REST_STEP} seconds less rest`}
+          >
+            −{REST_STEP}s
+          </button>
+          <div className="dock-progress" aria-hidden>
+            <div style={{ transform: `scaleX(${progress})` }} />
+          </div>
+          <button
+            className="rest-adjust"
+            type="button"
+            onClick={() => rest.add(REST_STEP)}
+            aria-label={`${REST_STEP} seconds more rest`}
+          >
+            +{REST_STEP}s
+          </button>
         </div>
 
         <div className="dock-actions">

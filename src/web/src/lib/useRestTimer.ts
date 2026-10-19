@@ -83,10 +83,13 @@ export function useRestTimer(): RestTimer {
     }
   }, [])
 
+  // Negative to shorten. Never into the past, though: that would fire the "rest over" alert on the
+  // spot, when the user only meant to trim it - ending a rest early is what stop() is for.
   const add = useCallback((seconds: number) => {
     firedRef.current = false
     setEndsAt((current) => {
-      const target = Math.max(Date.now(), current ?? Date.now()) + seconds * 1000
+      const now = Date.now()
+      const target = Math.max(now + 1000, Math.max(now, current ?? now) + seconds * 1000)
       try {
         sessionStorage.setItem(STORAGE_KEY, String(target))
       } catch {
@@ -94,7 +97,7 @@ export function useRestTimer(): RestTimer {
       }
       return target
     })
-    setTotal((current) => (current ?? 0) + seconds)
+    setTotal((current) => Math.max(1, (current ?? 0) + seconds))
   }, [])
 
   return { remaining, total, start, stop, add }

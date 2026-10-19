@@ -143,3 +143,9 @@ export const MoreIcon = (p: Props) => (
     <circle cx="19" cy="12" r="1.9" />
   </svg>
 )
+
+export const StopIcon = (p: Props) => (
+  <svg {...base} {...p}>
+    <rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" />
+  </svg>
+)
