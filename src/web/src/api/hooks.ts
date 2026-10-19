@@ -180,7 +180,9 @@ export function useDeleteRoutine() {
 export function useActiveWorkout() {
   return useQuery({
     queryKey: keys.activeWorkout,
-    queryFn: () => api<Workout | null>('/workouts/active'),
+    // With no workout open the API answers 200 with an empty body, which the client reads as
+    // undefined - and a query may not resolve to undefined. Null is the "none open" state.
+    queryFn: async () => (await api<Workout | null>('/workouts/active')) ?? null,
   })
 }
 
