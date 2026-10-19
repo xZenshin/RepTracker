@@ -317,8 +317,17 @@ textarea {
   padding: 16px;
 }
 
-.card + .card {
+/* Stacked surfaces are spaced by their neighbour, so a grid of cards in the stack needs the same
+   12px on both sides as a lone card would get. */
+.card + .card,
+.card + .grid,
+.grid + .card {
   margin-top: 12px;
+}
+
+/* Inside a grid the gap does the spacing; a sibling margin would push the second column down. */
+.grid > .card {
+  margin-top: 0;
 }
 
 .card-title {

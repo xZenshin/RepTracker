@@ -107,8 +107,8 @@ export default function Dashboard() {
             <MuscleGroups groups={data.muscleGroups} />
           </section>
 
-          <div className="grid cols-2" style={{ marginTop: 12 }}>
-            <section className="card" style={{ marginTop: 0 }}>
+          <div className="grid cols-2">
+            <section className="card">
               <div className="card-title">
                 <h2>Recent records</h2>
                 <span className="hint">Estimated 1RM</span>
@@ -133,7 +133,7 @@ export default function Dashboard() {
               )}
             </section>
 
-            <section className="card" style={{ marginTop: 0 }}>
+            <section className="card">
               <div className="card-title">
                 <h2>Worth a look</h2>
                 <span className="hint">Stalled or skipped</span>
