@@ -204,10 +204,9 @@
   background: var(--heat-0);
 }
 
-.heat-cell.l1 { background: var(--heat-1); }
-.heat-cell.l2 { background: var(--heat-2); }
-.heat-cell.l3 { background: var(--heat-3); }
-.heat-cell.l4 { background: var(--heat-4); }
+/* Trained or not, nothing in between. The strongest step of the validated ramp, for the most
+   contrast against an empty day in either theme. */
+.heat-cell.on { background: var(--heat-4); }
 
 .heat-legend {
   display: flex;

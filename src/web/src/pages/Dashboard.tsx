@@ -82,6 +82,14 @@ export default function Dashboard() {
 
           <section className="card">
             <div className="card-title">
+              <h2>Consistency</h2>
+              <span className="hint">Last 12 months</span>
+            </div>
+            <Heatmap />
+          </section>
+
+          <section className="card">
+            <div className="card-title">
               <h2>Weekly volume</h2>
               <span className="hint">Total load lifted each week</span>
             </div>
@@ -94,14 +102,6 @@ export default function Dashboard() {
               <span className="hint">Weekly average</span>
             </div>
             <MuscleGroups groups={data.muscleGroups} />
-          </section>
-
-          <section className="card">
-            <div className="card-title">
-              <h2>Consistency</h2>
-              <span className="hint">Last 12 months</span>
-            </div>
-            <Heatmap />
           </section>
 
           <div className="grid cols-2" style={{ marginTop: 12 }}>
@@ -271,9 +271,13 @@ function MuscleGroups({ groups }: { groups: MuscleGroupLoad[] }) {
   const trained = groups.filter((group) => group.sets > 0)
   const untrained = groups.filter((group) => group.sets === 0)
 
-  // A fixed 26-set ceiling keeps the target band in the same place on every row, so the bars can
-  // be compared to each other and to the band at a glance.
-  const scaleMax = Math.max(26, ...trained.map((g) => g.setsPerWeek))
+  // The target band, in hard sets a week.
+  const bandLow = 4
+  const bandHigh = 8
+
+  // A fixed ceiling half again above the band keeps it in the same place on every row, so the bars
+  // can be compared to each other and to the band at a glance.
+  const scaleMax = Math.max(bandHigh * 1.5, ...trained.map((g) => g.setsPerWeek))
   const pct = (value: number) => `${Math.min(100, (value / scaleMax) * 100)}%`
 
   if (trained.length === 0) {
@@ -287,7 +291,7 @@ function MuscleGroups({ groups }: { groups: MuscleGroupLoad[] }) {
           <div key={group.muscleGroup} className="muscle-row">
             <span className="faint">{group.muscleGroup}</span>
             <div className="muscle-track">
-              <div className="muscle-band" style={{ left: pct(10), width: `calc(${pct(20)} - ${pct(10)})` }} />
+              <div className="muscle-band" style={{ left: pct(bandLow), width: `calc(${pct(bandHigh)} - ${pct(bandLow)})` }} />
               <div className="muscle-fill" style={{ width: pct(group.setsPerWeek) }} />
             </div>
             <span className="value">
@@ -299,8 +303,7 @@ function MuscleGroups({ groups }: { groups: MuscleGroupLoad[] }) {
       </div>
 
       <p className="faint small" style={{ marginTop: 12 }}>
-        The shaded band is 10-20 hard sets a week, the range most training research points at for
-        growth. Warm-ups and cardio are excluded.
+        The shaded band is {bandLow}-{bandHigh} hard sets a week. Warm-ups and cardio are excluded.
         {untrained.length > 0 ? ` Untrained this period: ${untrained.map((g) => g.muscleGroup).join(', ')}.` : ''}
       </p>
     </>
@@ -384,8 +387,8 @@ function Heatmap() {
             {weeks.flat().map((cell) => (
               <div
                 key={cell.date}
-                className={`heat-cell${cell.level > 0 ? ` l${cell.level}` : ''}`}
-                title={cell.day ? `${cell.date}: ${cell.day.sets} sets` : `${cell.date}: rest`}
+                className={`heat-cell${cell.trained ? ' on' : ''}`}
+                title={`${cell.date}: ${cell.trained ? 'workout' : 'rest'}`}
               />
             ))}
           </div>
@@ -393,13 +396,10 @@ function Heatmap() {
       </div>
 
       <div className="heat-legend">
-        Less
         <span className="heat-cell" />
-        <span className="heat-cell l1" />
-        <span className="heat-cell l2" />
-        <span className="heat-cell l3" />
-        <span className="heat-cell l4" />
-        More
+        Rest
+        <span className="heat-cell on" style={{ marginLeft: 8 }} />
+        Workout
       </div>
     </>
   )
@@ -407,14 +407,13 @@ function Heatmap() {
 
 interface Cell {
   date: string
-  day?: CalendarDay
-  level: number
+  trained: boolean
 }
 
 /**
  * Whole weeks of seven days, Monday-first, covering the last year and ending with the current week.
- * Intensity buckets on set count rather than volume, so a heavy squat day and a long accessory day
- * read as comparable effort.
+ * Each day is simply trained or not: consistency is about showing up, so a short session counts
+ * the same as a long one.
  */
 function buildCalendarGrid(byDate: Map<string, CalendarDay>): Cell[][] {
   const today = new Date()
@@ -430,21 +429,13 @@ function buildCalendarGrid(byDate: Map<string, CalendarDay>): Cell[][] {
   const weeks: Cell[][] = []
   for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
     const date = isoDate(cursor)
-    const day = byDate.get(date)
-    const cell: Cell = { date, day, level: day ? level(day.sets) : 0 }
+    const cell: Cell = { date, trained: (byDate.get(date)?.workouts ?? 0) > 0 }
 
     if (weeks.length === 0 || weeks[weeks.length - 1].length === 7) weeks.push([])
     weeks[weeks.length - 1].push(cell)
   }
 
   return weeks
-}
-
-function level(sets: number) {
-  if (sets >= 24) return 4
-  if (sets >= 16) return 3
-  if (sets >= 8) return 2
-  return 1
 }
 
 function ratioTone(value: number, low: number, high: number) {
