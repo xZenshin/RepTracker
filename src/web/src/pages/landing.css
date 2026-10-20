@@ -536,10 +536,6 @@
   font-weight: 600;
 }
 
-.m-table tr.warm td {
-  color: var(--text-faint);
-}
-
 .m-table td:last-child,
 .m-table th:last-child {
   width: 26px;

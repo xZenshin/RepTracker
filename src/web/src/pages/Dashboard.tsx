@@ -256,7 +256,7 @@ function MuscleGroups({ groups }: { groups: MuscleGroupLoad[] }) {
       </div>
 
       <p className="faint small" style={{ marginTop: 12 }}>
-        The shaded band is {bandLow}-{bandHigh} hard sets a week. Warm-ups and cardio are excluded.
+        The shaded band is {bandLow}-{bandHigh} hard sets a week. Cardio is excluded.
         {untrained.length > 0 ? ` Untrained this period: ${untrained.map((g) => g.muscleGroup).join(', ')}.` : ''}
       </p>
     </>

@@ -20,7 +20,7 @@ public static class Mapping
 
     public static SetDto ToDto(this WorkoutSet s) =>
         new(s.Id, s.Position, s.WeightKg, s.Reps, s.DurationSeconds,
-            s.DistanceM, s.Rpe, s.IsWarmup, s.IsCompleted, s.CompletedAt);
+            s.DistanceM, s.Rpe, s.IsCompleted, s.CompletedAt);
 
     public static WorkoutDto ToDto(
         this Workout w,
@@ -49,7 +49,7 @@ public static class Mapping
         foreach (var we in w.Exercises)
         foreach (var s in we.Sets)
         {
-            if (!s.IsCompleted || s.IsWarmup) continue;
+            if (!s.IsCompleted) continue;
             sets++;
             reps += s.Reps ?? 0;
             volume += Formulas.SetVolumeKg(we.Exercise.Modality, s.WeightKg, s.Reps, bodyWeightKg);

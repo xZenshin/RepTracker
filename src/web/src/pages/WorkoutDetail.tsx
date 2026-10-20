@@ -90,12 +90,12 @@ export default function WorkoutDetail() {
             </thead>
             <tbody>
               {we.sets.map((set, index) => (
-                <tr key={set.id} className={set.isWarmup ? 'warmup' : ''}>
-                  <td className="tabular">{set.isWarmup ? 'W' : index + 1}</td>
+                <tr key={set.id}>
+                  <td className="tabular">{index + 1}</td>
                   <td className="tabular">{primaryCell(set, we.modality, units)}</td>
                   <td className="tabular">{secondaryCell(set, we.modality)}</td>
                   <td className="tabular faint">
-                    {set.isWarmup || !set.weightKg || !set.reps
+                    {!set.weightKg || !set.reps
                       ? '-'
                       : formatVolume(set.weightKg * set.reps, units)}
                   </td>

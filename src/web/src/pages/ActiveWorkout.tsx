@@ -383,7 +383,6 @@ function LogSetCard({
         </button>
         <span className="log-caption">
           Set {setNumber}
-          {target?.isWarmup ? ' · warm-up' : ''}
         </span>
       </div>
     </div>
@@ -438,17 +437,10 @@ function SetRow({
   return (
     <div
       ref={rowRef}
-      className={`set-row${set.isCompleted ? ' done' : ''}${set.isWarmup ? ' warmup' : ''}`}
+      className={`set-row${set.isCompleted ? ' done' : ''}`}
       role="row"
     >
-      <button
-        className="set-index"
-        type="button"
-        onClick={() => update.mutate({ weId, setId: set.id, isWarmup: !set.isWarmup })}
-        title={set.isWarmup ? 'Warm-up set - tap to make it a working set' : 'Tap to mark as a warm-up'}
-      >
-        {set.isWarmup ? 'W' : index + 1}
-      </button>
+      <span className="set-index" role="cell">{index + 1}</span>
 
       {fields.map((field) => (
         <input
@@ -934,11 +926,10 @@ function parseInputs(primary: string, secondary: string, modality: Modality, uni
 }
 
 function summarisePrevious(sets: PreviousSet[], units: Units): string {
-  const working = sets.filter((s) => !s.isWarmup)
-  if (working.length === 0) return 'warm-up only'
+  if (sets.length === 0) return 'no sets'
 
-  const top = working.reduce((best, s) => ((s.weightKg ?? 0) > (best.weightKg ?? 0) ? s : best))
-  return `${working.length} sets, top ${formatWeight(top.weightKg, units, false)} x ${top.reps ?? 0}`
+  const top = sets.reduce((best, s) => ((s.weightKg ?? 0) > (best.weightKg ?? 0) ? s : best))
+  return `${sets.length} sets, top ${formatWeight(top.weightKg, units, false)} x ${top.reps ?? 0}`
 }
 
 /** Accepts either "90" or "1:30" so a plank and a 20-minute row are both natural to enter. */

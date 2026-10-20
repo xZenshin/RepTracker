@@ -30,7 +30,7 @@ const FEATURES: Feature[] = [
     tone: 'blue',
     plate: { thick: 26, wide: 132 },
     title: 'Starts where you left off',
-    body: 'Every exercise opens on the sets you did last time, warm-ups included. Beat the numbers on screen, or match them on a heavy day.',
+    body: 'Every exercise opens on the sets you did last time. Beat the numbers on screen, or match them on a heavy day.',
     mock: <CarryOverMock />,
   },
   {
@@ -285,7 +285,6 @@ function LogSetMock() {
 
 function CarryOverMock() {
   const rows = [
-    { kg: 60, reps: 8, warmup: true },
     { kg: 80, reps: 8 },
     { kg: 80, reps: 8 },
     { kg: 80, reps: 7 },
@@ -303,8 +302,8 @@ function CarryOverMock() {
         </thead>
         <tbody>
           {rows.map((row, index) => (
-            <tr key={index} className={row.warmup ? 'warm' : undefined}>
-              <td>{row.warmup ? 'W' : index}</td>
+            <tr key={index}>
+              <td>{index + 1}</td>
               <td>{row.kg}</td>
               <td>{row.reps}</td>
               <td><span className="m-box" /></td>

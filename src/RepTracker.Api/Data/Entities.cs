@@ -165,9 +165,6 @@ public class WorkoutSet
     /// <summary>Rate of perceived exertion, 5.0-10.0 in half steps.</summary>
     public decimal? Rpe { get; set; }
 
-    /// <summary>Warm-ups are excluded from volume, hard-set counts and PRs.</summary>
-    public bool IsWarmup { get; set; }
-
     public bool IsCompleted { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
 }

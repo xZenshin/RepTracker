@@ -71,6 +71,8 @@ fresh clone that runs only `dotnet run` serves no UI — build the web app first
 /api/workouts    GET, GET active, POST, GET :id, PATCH :id, DELETE :id
                  POST/PUT/PATCH/DELETE .../exercises[/order|/:weId], POST .../exercises/:weId/swap
                  POST/PATCH/DELETE .../exercises/:weId/sets[/:setId]
+/api/import      POST workouts (raw text/csv; ?commit=true writes)
+/api/export      GET workouts (CSV download)
 /api/stats       GET overview, calendar, exercises, exercises/:id
 /api/health      GET (unauthenticated)
 ```
@@ -125,7 +127,7 @@ rest timer, so a reload lands back on it. On a phone the tab bar is hidden on `/
 
 **A workout exercise opens on last time's sets, not the routine's targets.** Starting a routine
 or adding an exercise copies the sets from the most recent finished workout containing that
-exercise (any routine, warm-ups included, unticked), via `CarryOver` in `WorkoutEndpoints`. An
+exercise (any routine, unticked), via `CarryOver` in `WorkoutEndpoints`. An
 exercise never done before starts clean: the routine's set count as empty rows, or no rows when
 added ad hoc. Routine target weight and reps are deliberately ignored here (owner decision,
 2026-10-19); they remain the written plan shown on the Train card. On such a first attempt, logging
@@ -197,13 +199,28 @@ cleanly in about a second. Things that will look odd:
 - *Exercise names match loosely* - case, spaces, hyphens and a plural s are ignored, and a few
   unambiguous shorthands (`squat`, `ohp`, `rdl`; not `row`) map to catalogue lifts. Every match under a
   different name is listed in the preview.
-- *Re-importing is harmless*: a workout starting at the same instant as an existing one is skipped -
-  matched on the start alone, so it holds even if the naming rules change. Imports start at noon.
+- *Re-importing is harmless*: a workout starting within a minute of an existing one is skipped -
+  matched on the start alone, so it holds even if the naming rules change. A minute, because the
+  export writes times to the minute. Imports of untimed dates start at noon.
 - *Imported workouts have no duration* (the export carries none), so the detail page shows a dash
   for time and they add nothing to time-trained totals.
 - *Separator and decimals are sniffed* (a European Excel writes `;` and `102,5`), and dates convert in
   the browser's named zone (`timeZone=Europe/Copenhagen`), not its current offset.
 - The per-account caps (workouts, exercises per workout, sets per exercise, custom exercises) apply.
+
+**Workouts export in the import's own format** (Settings, `GET /api/export/workouts`, 2026-10-20):
+every completed set of every finished workout, oldest first, weights in the user's units, written by
+`Import/WorkoutCsvExport.cs`. The one addition to the owner's format is a time in the Date cell
+(`17-Aug-2023 07:30`), which the importer reads; without it a re-import could neither tell two
+workouts on a day apart nor recognise ones it already has. A workout starting at noon exactly - an
+imported, untimed one - is written as the date alone, so an imported log comes back out as it went
+in. Verified by round trip: the owner's file imported, exported and compared line by line differs
+only by the importer's documented changes (empty sets dropped, plural names matched, week-year dates
+fixed, a superset's sets grouped under their exercise), and re-imports as 563 duplicates.
+
+**There are no warm-up sets** (removed 2026-10-20, owner decision; migration `RemoveWarmupSets`).
+Every completed set counts towards volume, hard sets and records. No set in the database was marked
+as a warm-up when the column was dropped, so no history changed.
 
 **Stats has two tabs: Overview (`/stats`) and Exercises (`/stats/exercises`).** Exercises lists every
 exercise with a completed working set in the last three years. Each row opens the per-exercise page

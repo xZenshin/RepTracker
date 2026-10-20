@@ -40,12 +40,11 @@ public static class Formulas
         EffectiveLoadKg(modality, weightKg, bodyWeightKg) * (reps ?? 0);
 
     /// <summary>
-    /// A "hard set" for weekly-volume purposes: a completed working set that actually loaded the
-    /// muscle. Warm-ups and conditioning work do not count toward a hypertrophy set target.
+    /// A "hard set" for weekly-volume purposes: a completed set that actually loaded the muscle.
+    /// Conditioning work does not count toward a hypertrophy set target.
     /// </summary>
     public static bool IsHardSet(WorkoutSet set, Modality modality) =>
         set.IsCompleted
-        && !set.IsWarmup
         && modality is Modality.WeightReps or Modality.BodyweightReps
         && set.Reps is > 0;
 }

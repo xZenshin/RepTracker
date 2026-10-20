@@ -189,7 +189,7 @@ export default function ExerciseList() {
 
           <p className="faint small exlist-legend">
             <b>New PR</b>: best estimated 1RM beaten in the last 30 days. <b>Stalled</b>: no new best
-            in six weeks, despite at least three sessions since. Warm-ups are not counted.
+            in six weeks, despite at least three sessions since.
           </p>
         </section>
       )}

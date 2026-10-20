@@ -14,6 +14,7 @@ public static class RateLimits
     public const string Login = "login";
     public const string Register = "register";
     public const string Import = "import";
+    public const string Export = "export";
 
     public static IServiceCollection AddAppRateLimiting(this IServiceCollection services) =>
         services.AddRateLimiter(o =>
@@ -55,6 +56,9 @@ public static class RateLimits
             // An import reads up to 2 MB and can write thousands of rows. A preview and a commit per
             // try leaves room for fixing a file a dozen times in ten minutes.
             o.AddPolicy(Import, ctx => Window($"import:{ClientKey(ctx)}", permit: 24, seconds: 600));
+
+            // An export reads every set the account has. Plenty for downloading a backup now and then.
+            o.AddPolicy(Export, ctx => Window($"export:{ClientKey(ctx)}", permit: 10, seconds: 600));
         });
 
     private static RateLimitPartition<string> Window(string key, int permit, int seconds) =>

@@ -72,7 +72,6 @@ export interface WorkoutSet {
   durationSeconds?: number | null
   distanceM?: number | null
   rpe?: number | null
-  isWarmup: boolean
   isCompleted: boolean
   completedAt?: string | null
 }
@@ -82,7 +81,6 @@ export interface PreviousSet {
   reps?: number | null
   durationSeconds?: number | null
   distanceM?: number | null
-  isWarmup: boolean
 }
 
 export interface PreviousPerformance {

@@ -159,7 +159,7 @@ Worth knowing, because the charts are only useful if you trust them.
 
 - **Everything is stored in kilograms.** kg/lb is a display conversion, so switching units never
   rewrites or fragments your history.
-- **Volume** is `load × reps`, over completed working sets only. Warm-ups never count, anywhere.
+- **Volume** is `load × reps`, over completed sets only. A row that was never ticked never counts.
 - **Bodyweight movements** use your bodyweight plus any added load, so pull-ups are not recorded as
   zero. Set your bodyweight in Settings or they stay at zero.
 - **Estimated 1RM** is Epley (`w × (1 + reps/30)`), taken from the best working set of a session,

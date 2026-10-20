@@ -304,7 +304,6 @@ export interface SetInput {
   durationSeconds?: number | null
   distanceM?: number | null
   rpe?: number | null
-  isWarmup?: boolean
   isCompleted?: boolean
 }
 

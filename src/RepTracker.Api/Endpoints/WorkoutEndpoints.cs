@@ -223,7 +223,7 @@ public static class WorkoutEndpoints
     // ---- exercises within a workout ----
 
     /// <summary>
-    /// The sets a workout exercise opens with: last time's, value for value and warm-ups included,
+    /// The sets a workout exercise opens with: last time's, value for value,
     /// left unticked so nothing counts until it is done again. With no last time, `emptyCount`
     /// blank rows.
     /// </summary>
@@ -231,7 +231,7 @@ public static class WorkoutEndpoints
         Guid weId, PreviousPerformanceDto? previous, int emptyCount, int limit)
     {
         IEnumerable<PreviousSetDto> template = previous?.Sets
-            ?? Enumerable.Repeat(new PreviousSetDto(null, null, null, null, false), emptyCount);
+            ?? Enumerable.Repeat(new PreviousSetDto(null, null, null, null), emptyCount);
 
         return template.Take(limit).Select((s, i) => new WorkoutSet
         {
@@ -242,7 +242,6 @@ public static class WorkoutEndpoints
             Reps = s.Reps,
             DurationSeconds = s.DurationSeconds,
             DistanceM = s.DistanceM,
-            IsWarmup = s.IsWarmup,
         });
     }
 
@@ -356,7 +355,7 @@ public static class WorkoutEndpoints
 
         var done = we.Sets.Where(s => s.IsCompleted).ToList();
         var open = we.Sets.Where(s => !s.IsCompleted).ToList();
-        var remaining = open.Count(s => !s.IsWarmup);
+        var remaining = open.Count;
 
         if (done.Count > 0 && workout.Exercises.Count >= options.Limits.ExercisesPerWorkout)
             return Validation.Problem($"A workout can hold at most {options.Limits.ExercisesPerWorkout} exercises.");
@@ -428,7 +427,6 @@ public static class WorkoutEndpoints
             DurationSeconds = Validation.Duration(body.DurationSeconds),
             DistanceM = Validation.Distance(body.DistanceM),
             Rpe = Validation.Rpe(body.Rpe),
-            IsWarmup = body.IsWarmup ?? false,
             IsCompleted = completed,
             CompletedAt = completed ? DateTimeOffset.UtcNow : null,
         };
@@ -452,7 +450,6 @@ public static class WorkoutEndpoints
         if (body.DurationSeconds is not null) set.DurationSeconds = Validation.Duration(body.DurationSeconds);
         if (body.DistanceM is not null) set.DistanceM = Validation.Distance(body.DistanceM);
         if (body.Rpe is not null) set.Rpe = Validation.Rpe(body.Rpe);
-        if (body.IsWarmup is not null) set.IsWarmup = body.IsWarmup.Value;
 
         if (body.IsCompleted is { } isCompleted && isCompleted != set.IsCompleted)
         {

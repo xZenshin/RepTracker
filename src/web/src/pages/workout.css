@@ -255,15 +255,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The set's number. Read-only: the row's inputs and tick do the work. */
 .set-index {
+  display: flex;
+  align-items: center;
   padding: 0 14px;
   text-align: left;
   font-size: 1rem;
   color: var(--text-dim);
-}
-
-.set-row.warmup .set-index {
-  color: var(--warn);
 }
 
 .set-input {

@@ -9,7 +9,7 @@ namespace RepTracker.Api.Stats;
 /// The approach is deliberately to pull narrow projections for the window in question and do the
 /// arithmetic in memory, rather than to express a dozen window functions in SQL. One person's
 /// training history is a few thousand rows a year, so this is cheap, and it keeps rules like
-/// "warm-ups never count" and "above twelve reps is not strength data" in one readable place.
+/// "only completed sets count" and "above twelve reps is not strength data" in one readable place.
 /// </summary>
 public class StatsService(AppDb db)
 {
@@ -443,7 +443,7 @@ public class StatsService(AppDb db)
             .ToListAsync(ct);
 
     /// <summary>
-    /// Completed working sets in a window. Warm-ups are filtered out at the source, so no caller
+    /// Completed sets in a window. Unticked rows are filtered out at the source, so no caller
     /// downstream has to remember to exclude them.
     /// </summary>
     private Task<List<SetRow>> WorkingSetsAsync(
@@ -453,8 +453,7 @@ public class StatsService(AppDb db)
             .Where(s => s.WorkoutExercise.Workout.UserId == userId
                         && s.WorkoutExercise.Workout.FinishedAt != null
                         && s.WorkoutExercise.Workout.StartedAt >= since
-                        && s.IsCompleted
-                        && !s.IsWarmup);
+                        && s.IsCompleted);
 
         if (exerciseId is not null)
             query = query.Where(s => s.WorkoutExercise.ExerciseId == exerciseId);

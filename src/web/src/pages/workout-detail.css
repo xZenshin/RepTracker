@@ -60,10 +60,6 @@
   white-space: nowrap;
 }
 
-.detail-sets tr.warmup td {
-  color: var(--text-faint);
-}
-
 .detail-sets td:first-child {
   width: 38px;
   color: var(--text-dim);

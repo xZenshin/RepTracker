@@ -16,7 +16,7 @@ export function computeTotals(workout: Workout, bodyWeightKg: number | null | un
 
   for (const exercise of workout.exercises) {
     for (const set of exercise.sets) {
-      if (!set.isCompleted || set.isWarmup) continue
+      if (!set.isCompleted) continue
 
       sets++
       reps += set.reps ?? 0

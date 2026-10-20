@@ -5,6 +5,7 @@ import type { Units } from '../api/types'
 import { defaultWeightStep, toDisplay, toKg, weightStep } from '../lib/units'
 import { formatDateFull } from '../lib/time'
 import { AlertIcon } from '../components/Icons'
+import ExportWorkouts from '../components/ExportWorkouts'
 import ImportWorkouts from '../components/ImportWorkouts'
 
 export default function Settings() {
@@ -122,6 +123,8 @@ export default function Settings() {
           </p>
         </label>
       </section>
+
+      <ExportWorkouts />
 
       <ImportWorkouts units={units} />
 

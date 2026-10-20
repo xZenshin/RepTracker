@@ -41,7 +41,7 @@ public record WorkoutDto(
     Guid Id, string Name, string? Notes, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt,
     Guid? RoutineId, string? RoutineName, WorkoutTotals Totals, List<WorkoutExerciseDto> Exercises);
 
-/// <summary>Volume counts completed working sets only; warm-ups are excluded everywhere.</summary>
+/// <summary>Volume counts completed sets only; an unticked row was never done.</summary>
 public record WorkoutTotals(decimal VolumeKg, int Sets, int Reps, int? DurationSeconds);
 
 public record WorkoutExerciseDto(
@@ -51,11 +51,11 @@ public record WorkoutExerciseDto(
 
 public record SetDto(
     Guid Id, int Position, decimal? WeightKg, int? Reps, int? DurationSeconds,
-    decimal? DistanceM, decimal? Rpe, bool IsWarmup, bool IsCompleted, DateTimeOffset? CompletedAt);
+    decimal? DistanceM, decimal? Rpe, bool IsCompleted, DateTimeOffset? CompletedAt);
 
 /// <summary>What this exercise looked like last time, so the phone can prefill "80 kg x 8".</summary>
 public record PreviousPerformanceDto(DateTimeOffset PerformedAt, List<PreviousSetDto> Sets);
-public record PreviousSetDto(decimal? WeightKg, int? Reps, int? DurationSeconds, decimal? DistanceM, bool IsWarmup);
+public record PreviousSetDto(decimal? WeightKg, int? Reps, int? DurationSeconds, decimal? DistanceM);
 
 public record WorkoutSummaryDto(
     Guid Id, string Name, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt,
@@ -71,11 +71,11 @@ public record UpdateWorkoutExerciseRequest(int? Position, int? RestSeconds, stri
 
 public record CreateSetRequest(
     decimal? WeightKg, int? Reps, int? DurationSeconds, decimal? DistanceM,
-    decimal? Rpe, bool? IsWarmup, bool? IsCompleted);
+    decimal? Rpe, bool? IsCompleted);
 
 public record UpdateSetRequest(
     decimal? WeightKg, int? Reps, int? DurationSeconds, decimal? DistanceM,
-    decimal? Rpe, bool? IsWarmup, bool? IsCompleted);
+    decimal? Rpe, bool? IsCompleted);
 
 public record PagedResult<T>(List<T> Items, string? NextCursor);
 

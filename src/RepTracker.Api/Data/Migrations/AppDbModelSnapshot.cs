@@ -319,9 +319,6 @@ namespace RepTracker.Api.Data.Migrations
                     b.Property<bool>("IsCompleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsWarmup")
-                        .HasColumnType("boolean");
-
                     b.Property<int>("Position")
                         .HasColumnType("integer");
 

@@ -42,7 +42,7 @@ public static class PreviousPerformance
         var setsByWorkoutExercise = await db.Sets
             .Where(s => mostRecent.Keys.Contains(s.WorkoutExerciseId) && s.IsCompleted)
             .OrderBy(s => s.Position)
-            .Select(s => new { s.WorkoutExerciseId, s.WeightKg, s.Reps, s.DurationSeconds, s.DistanceM, s.IsWarmup })
+            .Select(s => new { s.WorkoutExerciseId, s.WeightKg, s.Reps, s.DurationSeconds, s.DistanceM })
             .ToListAsync(ct);
 
         return setsByWorkoutExercise
@@ -51,6 +51,6 @@ public static class PreviousPerformance
                 g => mostRecent[g.Key].ExerciseId,
                 g => new PreviousPerformanceDto(
                     mostRecent[g.Key].StartedAt,
-                    [.. g.Select(s => new PreviousSetDto(s.WeightKg, s.Reps, s.DurationSeconds, s.DistanceM, s.IsWarmup))]));
+                    [.. g.Select(s => new PreviousSetDto(s.WeightKg, s.Reps, s.DurationSeconds, s.DistanceM))]));
     }
 }

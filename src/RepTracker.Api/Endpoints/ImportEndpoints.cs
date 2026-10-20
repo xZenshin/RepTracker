@@ -48,7 +48,7 @@ public static class ImportEndpoints
 
         var user = ctx.CurrentUser();
         var now = DateTimeOffset.UtcNow;
-        var zone = Zone(timeZone, offsetMinutes);
+        var zone = Zones.FromClient(timeZone, offsetMinutes);
         var parsed = WorkoutCsv.Parse(text, user.Units, zone, now, options.Limits);
         var errors = parsed.Errors.Select(e => new ImportErrorDto(e.Line, e.Message)).ToList();
 
@@ -104,23 +104,34 @@ public static class ImportEndpoints
             workout.Name = ExerciseGuess.WorkoutName(setsByPattern);
         }
 
-        // ---- a workout starting at the same moment as one already here is the same workout ----
+        // ---- a workout starting within a minute of one already here is the same workout ----
         // Matched on the start alone, not the name, so re-importing stays harmless even if the naming
-        // above changes. Imports start at noon to the second, which a live-logged workout never does.
+        // above changes. Within a minute, because the export writes times to the minute: a workout
+        // begun at 07:30:42 comes back as 07:30. Two real workouts never start a minute apart.
 
         var fresh = parsed.Workouts;
         if (fresh.Count > 0)
         {
-            var from = fresh.Min(w => w.StartedAt).ToUniversalTime();
-            var to = fresh.Max(w => w.StartedAt).ToUniversalTime();
+            var from = fresh.Min(w => w.StartedAt).AddMinutes(-1).ToUniversalTime();
+            var to = fresh.Max(w => w.StartedAt).AddMinutes(1).ToUniversalTime();
             var existing = (await db.Workouts
                     .Where(w => w.UserId == user.Id && w.StartedAt >= from && w.StartedAt <= to)
                     .Select(w => w.StartedAt)
                     .ToListAsync(ct))
                 .Select(s => s.UtcTicks)
-                .ToHashSet();
+                .Order()
+                .ToArray();
 
-            fresh = [.. parsed.Workouts.Where(w => !existing.Contains(w.StartedAt.UtcTicks))];
+            bool Taken(DateTimeOffset at)
+            {
+                var i = Array.BinarySearch(existing, at.UtcTicks);
+                if (i >= 0) return true;
+                i = ~i;
+                return (i < existing.Length && existing[i] - at.UtcTicks < TimeSpan.TicksPerMinute)
+                    || (i > 0 && at.UtcTicks - existing[i - 1] < TimeSpan.TicksPerMinute);
+            }
+
+            fresh = [.. parsed.Workouts.Where(w => !Taken(w.StartedAt))];
         }
         var duplicates = parsed.Workouts.Count - fresh.Count;
 
@@ -214,15 +225,4 @@ public static class ImportEndpoints
     private static string? Truncate(string value, int max) =>
         value.Length == 0 ? null : value.Length <= max ? value : value[..(max - 1)] + "…";
 
-    /// <summary>
-    /// The browser's named zone, so each date converts with its own daylight-saving offset; failing
-    /// that, today's offset.
-    /// </summary>
-    private static TimeZoneInfo Zone(string? id, int? offsetMinutes)
-    {
-        if (id is { Length: > 0 and <= 64 } && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var zone)) return zone;
-
-        var offset = TimeSpan.FromMinutes(Math.Clamp(offsetMinutes ?? 0, -840, 840));
-        return TimeZoneInfo.CreateCustomTimeZone("client", offset, "client", "client");
-    }
 }

@@ -137,6 +137,7 @@ app.MapRoutines();
 app.MapWorkouts();
 app.MapStats();
 app.MapImport();
+app.MapExport();
 
 // Anything that is not an API route is the single-page app, so deep links such as
 // /stats/<id> are served the shell and routed in the browser.
