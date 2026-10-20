@@ -19,8 +19,11 @@ public class StatsService(AppDb db)
     /// <summary>An exercise still in the rotation but stuck for this long is worth flagging.</summary>
     private const int StallWeeks = 6;
 
-    /// <summary>Rest days are healthy; three weeks away from a movement in your own plan is drift.</summary>
-    private const int NeglectedDays = 21;
+    /// <summary>Three weeks away from a movement means it has left the rotation, not stalled.</summary>
+    private const int RetiredDays = 21;
+
+    /// <summary>How recently a best must have been beaten to be flagged as a new record.</summary>
+    private const int RecentRecordDays = 30;
 
     /// <summary>Periods up to this long chart volume per day; longer ones per week.</summary>
     private const int DailyVolumeMaxWeeks = 13;
@@ -45,20 +48,13 @@ public class StatsService(AppDb db)
 
         var workouts = await AllWorkoutsAsync(userId, ct);
         var windowSets = await WorkingSetsAsync(userId, since, ct);
-        var strengthHistory = await WorkingSetsAsync(userId, now - RecordHistory, ct);
-        var perExercise = await PerExerciseActivityAsync(userId, ct);
-
-        var records = BuildRecordHistory(strengthHistory, bodyWeightKg);
 
         return new OverviewDto(
             Totals(workouts, windowSets, since, bodyWeightKg, weeks),
             Consistency(workouts, offsetMinutes, currentWeek),
             VolumeSeries(workouts, windowSets, bodyWeightKg, firstWeek, weeks, now, offsetMinutes),
             MuscleGroups(windowSets, bodyWeightKg, weeks),
-            Balance(windowSets),
-            [.. records.Where(r => r.AchievedAt >= since).OrderByDescending(r => r.AchievedAt).Take(15)],
-            Stalling(records, strengthHistory, perExercise, now),
-            await NeglectedAsync(userId, perExercise, now, ct));
+            Balance(windowSets));
     }
 
     /// <summary>
@@ -92,26 +88,47 @@ public class StatsService(AppDb db)
             })];
     }
 
-    /// <summary>Every exercise the user has actually trained, for the picker on the stats page.</summary>
+    /// <summary>
+    /// Every exercise the user has actually trained, with its bests and whether it has just set a
+    /// record or stalled. This is the stats page's exercise list and the picker on each exercise.
+    /// </summary>
     public async Task<List<ExerciseListItemDto>> ExerciseListAsync(
         Guid userId, decimal? bodyWeightKg, CancellationToken ct)
     {
-        var history = await WorkingSetsAsync(userId, DateTimeOffset.UtcNow - RecordHistory, ct);
+        var now = DateTimeOffset.UtcNow;
+        var history = await WorkingSetsAsync(userId, now - RecordHistory, ct);
+        var activity = await PerExerciseActivityAsync(userId, ct);
+
+        // The replay is chronological and only ever emits a higher estimate, so each exercise's
+        // last record is its current best, stamped with the moment it was first reached.
+        var bestByExercise = BuildRecordHistory(history, bodyWeightKg)
+            .GroupBy(r => r.ExerciseId)
+            .ToDictionary(g => g.Key, g => g.Last());
+        var stalled = Stalled(bestByExercise, history, activity, now);
 
         return [.. history
             .GroupBy(s => s.ExerciseId)
             .Select(g =>
             {
-                var best = g.Select(s => OneRepMax(s, bodyWeightKg)).Where(x => x is not null).DefaultIfEmpty().Max();
+                var best = bestByExercise.GetValueOrDefault(g.Key);
                 var heaviest = g.Select(s => Load(s, bodyWeightKg)).DefaultIfEmpty(0m).Max();
                 var first = g.First();
+
+                // A first-ever session is technically a record too, but flagging every new exercise
+                // would bury the real ones, so a record has to beat an earlier best.
+                var status =
+                    best is { PreviousBest: not null } && (now - best.AchievedAt).TotalDays <= RecentRecordDays ? "record"
+                    : stalled.Contains(g.Key) ? "stalled"
+                    : null;
 
                 return new ExerciseListItemDto(
                     g.Key, first.ExerciseName, first.MuscleGroup, first.Modality,
                     g.Select(s => s.WorkoutId).Distinct().Count(),
                     g.Max(s => s.StartedAt),
-                    best,
-                    heaviest > 0 ? heaviest : null);
+                    best?.EstimatedOneRepMax,
+                    best?.AchievedAt,
+                    heaviest > 0 ? heaviest : null,
+                    status);
             })
             .OrderByDescending(x => x.LastPerformedAt)];
     }
@@ -325,26 +342,22 @@ public class StatsService(AppDb db)
         return records;
     }
 
-    private static List<StallingDto> Stalling(
-        List<RecordDto> records, List<SetRow> history,
+    /// <summary>Exercises whose best estimated 1RM has not moved despite continued training.</summary>
+    private static HashSet<Guid> Stalled(
+        Dictionary<Guid, RecordDto> bestByExercise, List<SetRow> history,
         Dictionary<Guid, (DateTimeOffset Last, int Sessions)> activity, DateTimeOffset now)
     {
-        var bestByExercise = records
-            .GroupBy(r => r.ExerciseId)
-            .ToDictionary(g => g.Key, g => g.MaxBy(r => r.EstimatedOneRepMax)!);
-
-        var result = new List<StallingDto>();
+        var result = new HashSet<Guid>();
 
         foreach (var (exerciseId, record) in bestByExercise)
         {
             if (!activity.TryGetValue(exerciseId, out var a)) continue;
 
             // Only flag movements that are still part of training. An exercise you stopped doing
-            // months ago is not stalled, it is retired, and belongs in the neglected list instead.
-            if ((now - a.Last).TotalDays > NeglectedDays) continue;
+            // months ago is not stalled, it is retired.
+            if ((now - a.Last).TotalDays > RetiredDays) continue;
 
-            var weeksSince = (int)((now - record.AchievedAt).TotalDays / 7);
-            if (weeksSince < StallWeeks) continue;
+            if ((now - record.AchievedAt).TotalDays / 7 < StallWeeks) continue;
 
             var sessionsSince = history
                 .Where(s => s.ExerciseId == exerciseId && s.StartedAt > record.AchievedAt)
@@ -355,41 +368,10 @@ public class StatsService(AppDb db)
             // Needs a few attempts since the record before "stalled" is a fair description.
             if (sessionsSince < 3) continue;
 
-            result.Add(new StallingDto(
-                exerciseId, record.ExerciseName, record.EstimatedOneRepMax,
-                record.AchievedAt, weeksSince, sessionsSince));
+            result.Add(exerciseId);
         }
 
-        return [.. result.OrderByDescending(x => x.WeeksSinceBest).Take(8)];
-    }
-
-    /// <summary>Movements the user's own routines call for but that have quietly dropped out.</summary>
-    private async Task<List<NeglectedDto>> NeglectedAsync(
-        Guid userId, Dictionary<Guid, (DateTimeOffset Last, int Sessions)> activity,
-        DateTimeOffset now, CancellationToken ct)
-    {
-        var planned = await db.RoutineExercises
-            .Where(re => re.Routine.UserId == userId && !re.Routine.IsArchived && !re.Exercise.IsArchived)
-            .Select(re => new { re.ExerciseId, Name = re.Exercise.Name, Routine = re.Routine.Name })
-            .ToListAsync(ct);
-
-        return [.. planned
-            .DistinctBy(p => p.ExerciseId)
-            .Select(p => new
-            {
-                p.ExerciseId,
-                p.Name,
-                p.Routine,
-                Last = activity.TryGetValue(p.ExerciseId, out var a) ? a.Last : (DateTimeOffset?)null,
-            })
-            .Where(p => p.Last is null || (now - p.Last.Value).TotalDays >= NeglectedDays)
-            .Select(p => new NeglectedDto(
-                p.ExerciseId, p.Name,
-                p.Last ?? DateTimeOffset.MinValue,
-                p.Last is null ? int.MaxValue : (int)(now - p.Last.Value).TotalDays,
-                p.Routine))
-            .OrderByDescending(p => p.DaysSince)
-            .Take(8)];
+        return result;
     }
 
     // ---- per-exercise sections ----

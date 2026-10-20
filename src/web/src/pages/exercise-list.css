@@ -1,0 +1,158 @@
+.exlist-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.exlist-search {
+  position: relative;
+  flex: 1 1 240px;
+}
+
+.exlist-search svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  translate: 0 -50%;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.exlist-search .input {
+  padding-left: 36px;
+}
+
+.exlist-toolbar .select {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.exlist {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.exlist th {
+  padding: 0 0 8px;
+  text-align: left;
+}
+
+.exlist th.num,
+.exlist td.num {
+  text-align: right;
+}
+
+.exlist th button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.exlist th button:hover,
+.exlist th[aria-sort] button {
+  color: var(--text);
+}
+
+/* Reserves the arrow's width on every header, so sorting never shifts a column. */
+.exlist-arrow {
+  display: inline-block;
+  width: 0.7em;
+  text-align: center;
+}
+
+.exlist tbody tr {
+  /* Anchors the name link's overlay, which makes the whole row the click target. */
+  position: relative;
+}
+
+.exlist tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.exlist td {
+  padding: 9px 0;
+  border-top: 1px solid var(--border);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.exlist td:first-child {
+  padding-left: 8px;
+  color: var(--text);
+}
+
+.exlist td:last-child {
+  padding-right: 8px;
+}
+
+.exlist td + td {
+  padding-left: 18px;
+}
+
+.exlist td.strong {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.exlist-name {
+  font-weight: 600;
+}
+
+.exlist-name::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.exlist-name:focus-visible {
+  outline: none;
+}
+
+.exlist-name:focus-visible::after {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.exlist .chip {
+  margin-left: 8px;
+  padding: 1px 7px;
+  font-size: 0.68rem;
+  vertical-align: 1px;
+}
+
+.exlist .chip svg {
+  width: 12px;
+  height: 12px;
+}
+
+.exlist-none {
+  padding: 18px 8px;
+}
+
+.exlist-reset {
+  padding: 0;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.exlist-legend {
+  margin-top: 12px;
+}
+
+.exlist-legend b {
+  color: var(--text-dim);
+  font-weight: 600;
+}

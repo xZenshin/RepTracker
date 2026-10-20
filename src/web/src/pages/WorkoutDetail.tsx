@@ -73,7 +73,7 @@ export default function WorkoutDetail() {
         <section key={we.id} className="card detail-exercise">
           <div className="card-title">
             <h2>
-              {isDesktop ? <Link to={`/stats/${we.exerciseId}`}>{we.exerciseName}</Link> : we.exerciseName}
+              {isDesktop ? <Link to={`/stats/exercises/${we.exerciseId}`}>{we.exerciseName}</Link> : we.exerciseName}
             </h2>
             <span className="hint">{we.muscleGroup}</span>
           </div>

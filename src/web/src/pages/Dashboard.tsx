@@ -6,8 +6,9 @@ import {
 import { useCalendar, useMe, useOverview } from '../api/hooks'
 import type { CalendarDay, MuscleGroupLoad, Units, VolumeSeries } from '../api/types'
 import { formatVolume, toDisplay } from '../lib/units'
-import { formatHours, formatRelative, isoDate } from '../lib/time'
-import { AlertIcon, FlameIcon, TrophyIcon } from '../components/Icons'
+import { formatHours, isoDate } from '../lib/time'
+import { FlameIcon } from '../components/Icons'
+import StatsTabs from '../components/StatsTabs'
 import '../styles/viz.css'
 
 // Months for the reader, whole weeks underneath: every statistic here buckets by Monday-start week,
@@ -46,6 +47,8 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      <StatsTabs />
 
       {isPending || !data ? (
         <LoadingDashboard />
@@ -106,70 +109,6 @@ export default function Dashboard() {
             </div>
             <MuscleGroups groups={data.muscleGroups} />
           </section>
-
-          <div className="grid cols-2">
-            <section className="card">
-              <div className="card-title">
-                <h2>Recent records</h2>
-                <span className="hint">Estimated 1RM</span>
-              </div>
-              {data.recentRecords.length === 0 ? (
-                <p className="muted small">No new records in this period. That happens - check the volume chart.</p>
-              ) : (
-                <div className="insight-list">
-                  {data.recentRecords.slice(0, 8).map((record) => (
-                    <Link key={`${record.exerciseId}-${record.achievedAt}`} className="insight-row" to={`/stats/${record.exerciseId}`}>
-                      <TrophyIcon className="status-icon" style={{ color: 'var(--success)' }} />
-                      <span className="name">{record.exerciseName}</span>
-                      <span className="meta">
-                        {formatVolume(record.estimatedOneRepMax, units).replace(/ t$/, ' t')}
-                        {record.previousBest
-                          ? ` (+${Math.round(record.estimatedOneRepMax - record.previousBest)})`
-                          : ''}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className="card">
-              <div className="card-title">
-                <h2>Worth a look</h2>
-                <span className="hint">Stalled or skipped</span>
-              </div>
-
-              {data.stalling.length === 0 && data.neglected.length === 0 ? (
-                <p className="muted small">Nothing stalled and nothing skipped. Keep going.</p>
-              ) : (
-                <div className="insight-list">
-                  {data.stalling.map((item) => (
-                    <Link key={item.exerciseId} className="insight-row" to={`/stats/${item.exerciseId}`}>
-                      <AlertIcon className="status-icon" style={{ color: 'var(--warn)' }} />
-                      <span className="name">
-                        {item.exerciseName}
-                        <span className="faint small"> stalled</span>
-                      </span>
-                      <span className="meta">{item.weeksSinceBest}w, {item.sessionsSinceBest} sessions</span>
-                    </Link>
-                  ))}
-
-                  {data.neglected.map((item) => (
-                    <Link key={item.exerciseId} className="insight-row" to={`/stats/${item.exerciseId}`}>
-                      <AlertIcon className="status-icon" style={{ color: 'var(--text-faint)' }} />
-                      <span className="name">
-                        {item.exerciseName}
-                        <span className="faint small"> skipped in {item.source}</span>
-                      </span>
-                      <span className="meta">
-                        {item.daysSince > 3650 ? 'never' : formatRelative(item.lastPerformedAt)}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
 
           <section className="card">
             <div className="card-title">

@@ -48,7 +48,7 @@ export default function ExerciseDetail() {
           <select
             className="select"
             value={exerciseId ?? ''}
-            onChange={(event) => navigate(`/stats/${event.target.value}`, { replace: true })}
+            onChange={(event) => navigate(`/stats/exercises/${event.target.value}`, { replace: true })}
           >
             {all.map((item) => (
               <option key={item.id} value={item.id}>

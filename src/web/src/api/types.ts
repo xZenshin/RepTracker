@@ -197,42 +197,12 @@ export interface Balance {
   upperLowerRatio?: number | null
 }
 
-export interface PersonalRecord {
-  exerciseId: string
-  exerciseName: string
-  achievedAt: string
-  estimatedOneRepMax: number
-  weightKg: number
-  reps: number
-  previousBest?: number | null
-}
-
-export interface Stalling {
-  exerciseId: string
-  exerciseName: string
-  bestOneRepMax: number
-  bestAchievedAt: string
-  weeksSinceBest: number
-  sessionsSinceBest: number
-}
-
-export interface Neglected {
-  exerciseId: string
-  exerciseName: string
-  lastPerformedAt: string
-  daysSince: number
-  source: string
-}
-
 export interface Overview {
   totals: PeriodTotals
   consistency: Consistency
   volume: VolumeSeries
   muscleGroups: MuscleGroupLoad[]
   balance: Balance
-  recentRecords: PersonalRecord[]
-  stalling: Stalling[]
-  neglected: Neglected[]
 }
 
 export interface CalendarDay {
@@ -250,7 +220,10 @@ export interface ExerciseListItem {
   sessions: number
   lastPerformedAt?: string | null
   bestOneRepMax?: number | null
+  bestOneRepMaxAt?: string | null
   bestWeightKg?: number | null
+  /** A best beaten within the last month, or no progress in six weeks of training. */
+  status?: 'record' | 'stalled' | null
 }
 
 export interface ExerciseSessionPoint {

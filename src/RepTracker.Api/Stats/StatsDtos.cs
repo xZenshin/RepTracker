@@ -7,10 +7,7 @@ public record OverviewDto(
     ConsistencyDto Consistency,
     VolumeSeriesDto Volume,
     List<MuscleGroupLoadDto> MuscleGroups,
-    BalanceDto Balance,
-    List<RecordDto> RecentRecords,
-    List<StallingDto> Stalling,
-    List<NeglectedDto> Neglected);
+    BalanceDto Balance);
 
 public record PeriodTotals(
     int Workouts, decimal VolumeKg, int Sets, int Reps, int DurationSeconds, decimal AvgWorkoutsPerWeek);
@@ -42,25 +39,25 @@ public record BalanceDto(
     int PushSets, int PullSets, int LegSets, int CoreSets, int CardioSets,
     decimal? PushPullRatio, decimal? UpperLowerRatio);
 
+/// <summary>A moment an exercise's best estimated 1RM was beaten, from replaying its history.</summary>
 public record RecordDto(
     Guid ExerciseId, string ExerciseName, DateTimeOffset AchievedAt,
     decimal EstimatedOneRepMax, decimal WeightKg, int Reps, decimal? PreviousBest);
-
-/// <summary>An exercise whose estimated 1RM has not moved in a while: a candidate for a change.</summary>
-public record StallingDto(
-    Guid ExerciseId, string ExerciseName, decimal BestOneRepMax,
-    DateTimeOffset BestAchievedAt, int WeeksSinceBest, int SessionsSinceBest);
-
-public record NeglectedDto(
-    Guid ExerciseId, string ExerciseName, DateTimeOffset LastPerformedAt, int DaysSince, string Source);
 
 public record CalendarDayDto(DateOnly Date, int Workouts, decimal VolumeKg, int Sets);
 
 // ---- per-exercise ----
 
+/// <summary>
+/// One row of the exercise list. <see cref="Status"/> is "record" when the best estimated 1RM beat
+/// an earlier best within the last month, "stalled" when it has not moved in six weeks of continued
+/// training, and null otherwise.
+/// </summary>
 public record ExerciseListItemDto(
     Guid Id, string Name, string MuscleGroup, Modality Modality,
-    int Sessions, DateTimeOffset? LastPerformedAt, decimal? BestOneRepMax, decimal? BestWeightKg);
+    int Sessions, DateTimeOffset? LastPerformedAt,
+    decimal? BestOneRepMax, DateTimeOffset? BestOneRepMaxAt, decimal? BestWeightKg,
+    string? Status);
 
 public record ExerciseStatsDto(
     Guid ExerciseId, string ExerciseName, string MuscleGroup, Modality Modality,

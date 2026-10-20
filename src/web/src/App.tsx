@@ -14,6 +14,7 @@ import Settings from './pages/Settings'
 // The charting library is a third of the bundle and only the stats pages use it. Splitting it out
 // keeps the screen you open in the gym small, which is the one loading on bad signal.
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+const ExerciseList = lazy(() => import('./pages/ExerciseList'))
 const ExerciseDetail = lazy(() => import('./pages/ExerciseDetail'))
 
 export default function App() {
@@ -58,7 +59,11 @@ export default function App() {
             The guard sits above Lazy so a phone never downloads the charting chunk at all. */}
         <Route path="/stats" element={isDesktop ? <Lazy><Dashboard /></Lazy> : <Navigate to="/" replace />} />
         <Route
-          path="/stats/:exerciseId"
+          path="/stats/exercises"
+          element={isDesktop ? <Lazy><ExerciseList /></Lazy> : <Navigate to="/" replace />}
+        />
+        <Route
+          path="/stats/exercises/:exerciseId"
           element={isDesktop ? <Lazy><ExerciseDetail /></Lazy> : <Navigate to="/" replace />}
         />
         <Route path="/settings" element={<Settings />} />

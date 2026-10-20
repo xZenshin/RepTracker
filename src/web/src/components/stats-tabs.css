@@ -1,0 +1,34 @@
+.stats-tabs {
+  display: flex;
+  gap: 22px;
+  margin: -4px 0 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.stats-tabs a {
+  position: relative;
+  padding: 8px 0 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.stats-tabs a:hover {
+  color: var(--text);
+}
+
+.stats-tabs a.active {
+  color: var(--text);
+}
+
+/* Sits on top of the container's border, so the active tab reads as part of the line. */
+.stats-tabs a.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}

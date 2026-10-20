@@ -139,8 +139,19 @@ keys. A 401 from any query or mutation routes through the same helper (`main.tsx
 or revoked session drops to the login screen the same way an explicit sign-out does.
 
 **Personal records are reconstructed by replaying history**, not stored in a records table. Editing
-or deleting a set therefore corrects the PR feed instead of leaving a phantom behind.
+or deleting a set therefore corrects the New PR badges instead of leaving a phantom behind.
 `StatsService.BuildRecordHistory`.
+
+**Stats has two tabs: Overview (`/stats`) and Exercises (`/stats/exercises`).** Exercises lists every
+exercise with a completed working set in the last three years. Each row opens the per-exercise page
+at `/stats/exercises/:id`. It replaced the overview's Recent records and Worth a look cards (owner
+decision, 2026-10-20). Their signals became badges on the rows: **New PR** when the best estimated
+1RM beat an *earlier* best within 30 days, so a first session never counts; **Stalled** when the best
+is 6+ weeks old despite 3+ sessions since, and the exercise was done in the last 21 days. The
+"skipped in a routine" signal was dropped; each row's Last done column covers it. The list's
+search, filter and sort live in the URL query, so Back from an exercise returns to the same view.
+On the demo account most lifts show New PR, because `DemoData` progresses steadily. That's
+expected.
 
 **Estimated 1RM is discarded above 12 reps.** Past there Epley stops tracking strength. Those sets
 still count as volume. `Formulas.EstimatedOneRepMax`.
