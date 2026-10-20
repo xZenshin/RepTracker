@@ -32,8 +32,8 @@ public class AppOptions
     {
         public int Workouts { get; set; } = 2000;
         public int ExercisesPerWorkout { get; set; } = 40;
-        public int SetsPerExercise { get; set; } = 40;
-        public int CustomExercises { get; set; } = 300;
+        public int SetsPerExercise { get; set; } = 20;
+        public int CustomExercises { get; set; } = 100;
         public int Routines { get; set; } = 60;
         public int ExercisesPerRoutine { get; set; } = 40;
     }

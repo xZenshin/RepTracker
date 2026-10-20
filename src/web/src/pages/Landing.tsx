@@ -101,7 +101,7 @@ export default function Landing({ onStart }: { onStart: (mode: Mode) => void }) 
       </header>
 
       <section className="lp-hero">
-        <h1>The logbook for the minute between sets</h1>
+        <h1>Chill workout tracker</h1>
         <p className="lp-lede">
           RepTracker logs your sets with one thumb, times your rest, and shows you which lifts are
           moving. No email or password needed.
