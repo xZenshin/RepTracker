@@ -11,6 +11,11 @@ interface Props {
   onClose: () => void
   /** Already in the workout or routine: still selectable, but marked so duplicates are deliberate. */
   usedIds?: Set<string>
+  /**
+   * Swapping rather than adding: the exercise being replaced is left out of the list, and the ones
+   * most like it are offered first.
+   */
+  replacing?: { id: string; name: string; similar: Exercise[] }
 }
 
 const MUSCLE_GROUPS = [
@@ -18,7 +23,7 @@ const MUSCLE_GROUPS = [
   'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Core', 'Forearms', 'Cardio',
 ]
 
-export default function ExercisePicker({ onPick, onClose, usedIds }: Props) {
+export default function ExercisePicker({ onPick, onClose, usedIds, replacing }: Props) {
   const { data: exercises, isPending } = useExercises()
   const [query, setQuery] = useState('')
   const [group, setGroup] = useState<string | null>(null)
@@ -29,6 +34,7 @@ export default function ExercisePicker({ onPick, onClose, usedIds }: Props) {
     const needle = query.trim().toLowerCase()
 
     return exercises.filter((exercise) => {
+      if (exercise.id === replacing?.id) return false
       if (group && exercise.muscleGroup !== group) return false
       if (!needle) return true
       return (
@@ -37,7 +43,10 @@ export default function ExercisePicker({ onPick, onClose, usedIds }: Props) {
         exercise.muscleGroup.toLowerCase().includes(needle)
       )
     })
-  }, [exercises, query, group])
+  }, [exercises, query, group, replacing?.id])
+
+  // Suggestions only while browsing; a search or a muscle filter means the user knows what they want.
+  const similar = replacing && !query.trim() && !group ? replacing.similar : []
 
   const grouped = useMemo(() => {
     const map = new Map<string, Exercise[]>()
@@ -55,6 +64,7 @@ export default function ExercisePicker({ onPick, onClose, usedIds }: Props) {
     return (
       <CreateExercise
         initialName={query.trim()}
+        verb={replacing ? 'swap in' : 'add'}
         onClose={() => setCreating(false)}
         onCreated={(exercise) => onPick(exercise)}
       />
@@ -63,7 +73,7 @@ export default function ExercisePicker({ onPick, onClose, usedIds }: Props) {
 
   return (
     <Sheet
-      title="Add exercise"
+      title={replacing ? `Swap ${replacing.name}` : 'Add exercise'}
       onClose={onClose}
       footer={
         <button className="btn block" type="button" onClick={() => setCreating(true)}>
@@ -109,29 +119,46 @@ export default function ExercisePicker({ onPick, onClose, usedIds }: Props) {
           <p className="small">Create it as a custom exercise instead.</p>
         </div>
       ) : (
-        grouped.map(([groupName, items]) => (
-          <section key={groupName} className="picker-group">
-            <h3 className="faint small">{groupName}</h3>
-            {items.map((exercise) => (
-              <button key={exercise.id} className="picker-item" type="button" onClick={() => onPick(exercise)}>
-                <span className="name">{exercise.name}</span>
-                <span className="row">
-                  {usedIds?.has(exercise.id) ? <span className="chip accent">added</span> : null}
-                  {exercise.isCustom ? <span className="chip">custom</span> : null}
-                  <span className="faint small">{exercise.equipment}</span>
-                </span>
-              </button>
-            ))}
-          </section>
-        ))
+        <>
+          {similar.length > 0 ? (
+            <section className="picker-group picker-similar">
+              <h3 className="faint small">Similar to {replacing?.name}</h3>
+              {similar.map((exercise) => (
+                <PickerItem key={exercise.id} exercise={exercise} used={usedIds?.has(exercise.id)} onPick={onPick} />
+              ))}
+            </section>
+          ) : null}
+
+          {grouped.map(([groupName, items]) => (
+            <section key={groupName} className="picker-group">
+              <h3 className="faint small">{groupName}</h3>
+              {items.map((exercise) => (
+                <PickerItem key={exercise.id} exercise={exercise} used={usedIds?.has(exercise.id)} onPick={onPick} />
+              ))}
+            </section>
+          ))}
+        </>
       )}
     </Sheet>
   )
 }
 
+function PickerItem({ exercise, used, onPick }: { exercise: Exercise; used?: boolean; onPick: (exercise: Exercise) => void }) {
+  return (
+    <button className="picker-item" type="button" onClick={() => onPick(exercise)}>
+      <span className="name">{exercise.name}</span>
+      <span className="row">
+        {used ? <span className="chip accent">added</span> : null}
+        {exercise.isCustom ? <span className="chip">custom</span> : null}
+        <span className="faint small">{exercise.equipment}</span>
+      </span>
+    </button>
+  )
+}
+
 function CreateExercise({
-  initialName, onClose, onCreated,
-}: { initialName: string; onClose: () => void; onCreated: (exercise: Exercise) => void }) {
+  initialName, verb, onClose, onCreated,
+}: { initialName: string; verb: string; onClose: () => void; onCreated: (exercise: Exercise) => void }) {
   const create = useCreateExercise()
   const [name, setName] = useState(initialName)
   const [muscleGroup, setMuscleGroup] = useState('Chest')
@@ -203,7 +230,7 @@ function CreateExercise({
         {create.error ? <p className="banner">{(create.error as ApiError).message}</p> : null}
 
         <button className="btn primary lg block" type="submit" disabled={!name.trim() || create.isPending}>
-          {create.isPending ? 'Creating...' : 'Create and add'}
+          {create.isPending ? 'Creating...' : `Create and ${verb}`}
         </button>
       </form>
     </Sheet>

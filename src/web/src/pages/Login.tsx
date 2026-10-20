@@ -106,17 +106,14 @@ function SignIn({ onSwitch }: { onSwitch: () => void }) {
 
 function SignUp({ onSwitch, onIssued }: { onSwitch: () => void; onIssued: (code: string) => void }) {
   const [displayName, setDisplayName] = useState('')
-  const [signupCode, setSignupCode] = useState('')
   const register = useRegister()
 
-  // The instance may be invite-only. Rather than probe for that, the field is always offered and
-  // simply left blank when it is not needed.
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault()
         register.mutate(
-          { displayName: displayName.trim() || undefined, signupCode: signupCode.trim() || undefined },
+          { displayName: displayName.trim() || undefined },
           { onSuccess: (data) => onIssued(data.loginCode) },
         )
       }}
@@ -130,16 +127,6 @@ function SignUp({ onSwitch, onIssued }: { onSwitch: () => void; onIssued: (code:
           placeholder="What should we call you?"
           maxLength={40}
           autoFocus
-        />
-      </label>
-
-      <label className="field">
-        <span className="label">Invite code (if you were given one)</span>
-        <input
-          className="input"
-          value={signupCode}
-          onChange={(event) => setSignupCode(event.target.value)}
-          placeholder="Leave blank if you weren't"
         />
       </label>
 

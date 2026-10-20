@@ -52,29 +52,7 @@ public static class ImportEndpoints
         var parsed = WorkoutCsv.Parse(text, user.Units, zone, now, options.Limits);
         var errors = parsed.Errors.Select(e => new ImportErrorDto(e.Line, e.Message)).ToList();
 
-        // ---- workouts already here are skipped, so importing the same file twice is harmless ----
-
-        var fresh = parsed.Workouts;
-        if (fresh.Count > 0)
-        {
-            var from = fresh.Min(w => w.StartedAt).ToUniversalTime();
-            var to = fresh.Max(w => w.StartedAt).ToUniversalTime();
-            var existing = (await db.Workouts
-                    .Where(w => w.UserId == user.Id && w.StartedAt >= from && w.StartedAt <= to)
-                    .Select(w => new { w.StartedAt, w.Name })
-                    .ToListAsync(ct))
-                .Select(w => (w.StartedAt.UtcTicks, w.Name.ToLowerInvariant()))
-                .ToHashSet();
-
-            fresh = [.. parsed.Workouts.Where(w => !existing.Contains((w.StartedAt.UtcTicks, w.Name.ToLowerInvariant())))];
-        }
-        var duplicates = parsed.Workouts.Count - fresh.Count;
-
-        var total = await db.Workouts.CountAsync(w => w.UserId == user.Id, ct);
-        if (total + fresh.Count > options.Limits.Workouts)
-            errors.Add(new(0, $"Importing {fresh.Count} workouts would pass the limit of {options.Limits.Workouts} per account."));
-
-        // ---- exercises: the catalogue and the user's own; anything unmatched is created ----
+        // ---- exercises: the catalogue and the user's own; anything unmatched would be created ----
 
         var visible = await db.Exercises.Where(e => e.UserId == null || e.UserId == user.Id).ToListAsync(ct);
 
@@ -84,43 +62,83 @@ public static class ImportEndpoints
             .GroupBy(e => WorkoutCsv.LooseKey(e.Name))
             .ToDictionary(g => g.Key, g => g.OrderBy(e => e.UserId == null ? 1 : 0).First());
 
-        // Each spelling in the file resolved once. A new exercise joins the lookup as soon as it is
-        // made, so "Sled-Push" further down lands on the "Sled Push" created above it.
+        // Each spelling resolved once. A new exercise joins the lookup as soon as it is made, so
+        // "Sled-Push" further down lands on the "Sled Push" made above it.
         var resolved = new Dictionary<string, Exercise>(StringComparer.OrdinalIgnoreCase);
-        var created = new List<Exercise>();
-        var matched = new HashSet<Guid>();
-        var renamed = new List<ImportRenamedDto>();
+        var candidates = new List<Exercise>();
 
-        foreach (var name in fresh.SelectMany(w => w.Exercises).Select(e => e.Name))
+        foreach (var name in parsed.Workouts.SelectMany(w => w.Exercises).Select(e => e.Name))
         {
             if (resolved.ContainsKey(name)) continue;
 
             var exercise = WorkoutCsv.Match(name, byLooseKey);
             if (exercise is null)
             {
-                var hints = parsed.Hints[name.ToLowerInvariant()];
+                var guess = ExerciseGuess.For(name);
                 exercise = new Exercise
                 {
                     Id = Guid.CreateVersion7(),
                     UserId = user.Id,
                     Name = name,
                     NameNormalized = name.ToLowerInvariant(),
-                    MuscleGroup = hints.MuscleGroup ?? "Other",
-                    Modality = WorkoutCsv.InferModality(hints),
+                    MuscleGroup = guess.MuscleGroup,
+                    Pattern = guess.Pattern,
+                    Equipment = guess.Equipment,
+                    Modality = WorkoutCsv.InferModality(parsed.Hints[name.ToLowerInvariant()]),
                     CreatedAt = now,
                 };
-                created.Add(exercise);
+                candidates.Add(exercise);
                 byLooseKey[WorkoutCsv.LooseKey(name)] = exercise;
-            }
-            else
-            {
-                if (created.All(c => c.Id != exercise.Id)) matched.Add(exercise.Id);
-                // Merging two spellings is a guess the user should see, not a silent decision.
-                if (!exercise.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) renamed.Add(new(name, exercise.Name));
             }
 
             resolved[name] = exercise;
         }
+
+        // ---- each workout is named for what was trained in it ----
+
+        foreach (var workout in parsed.Workouts)
+        {
+            var setsByPattern = workout.Exercises
+                .GroupBy(e => resolved[e.Name].Pattern)
+                .ToDictionary(g => g.Key, g => g.Sum(e => e.Sets.Count));
+            workout.Name = ExerciseGuess.WorkoutName(setsByPattern);
+        }
+
+        // ---- a workout starting at the same moment as one already here is the same workout ----
+        // Matched on the start alone, not the name, so re-importing stays harmless even if the naming
+        // above changes. Imports start at noon to the second, which a live-logged workout never does.
+
+        var fresh = parsed.Workouts;
+        if (fresh.Count > 0)
+        {
+            var from = fresh.Min(w => w.StartedAt).ToUniversalTime();
+            var to = fresh.Max(w => w.StartedAt).ToUniversalTime();
+            var existing = (await db.Workouts
+                    .Where(w => w.UserId == user.Id && w.StartedAt >= from && w.StartedAt <= to)
+                    .Select(w => w.StartedAt)
+                    .ToListAsync(ct))
+                .Select(s => s.UtcTicks)
+                .ToHashSet();
+
+            fresh = [.. parsed.Workouts.Where(w => !existing.Contains(w.StartedAt.UtcTicks))];
+        }
+        var duplicates = parsed.Workouts.Count - fresh.Count;
+
+        var total = await db.Workouts.CountAsync(w => w.UserId == user.Id, ct);
+        if (total + fresh.Count > options.Limits.Workouts)
+            errors.Add(new(0, $"Importing {fresh.Count} workouts would pass the limit of {options.Limits.Workouts} per account."));
+
+        // Only what the new workouts use is created or reported.
+        var used = fresh.SelectMany(w => w.Exercises).Select(e => resolved[e.Name]).ToHashSet();
+        var created = candidates.Where(used.Contains).ToList();
+        var matched = used.Where(e => !candidates.Contains(e)).ToList();
+
+        // Merging two spellings is a guess the user should see, not a silent decision.
+        var renamed = fresh.SelectMany(w => w.Exercises).Select(e => e.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(n => !resolved[n].Name.Equals(n, StringComparison.OrdinalIgnoreCase))
+            .Select(n => new ImportRenamedDto(n, resolved[n].Name))
+            .ToList();
 
         if (created.Count > 0)
         {
@@ -136,12 +154,17 @@ public static class ImportEndpoints
             Rows: parsed.Rows,
             Workouts: fresh.Count,
             Sets: fresh.Sum(w => w.Exercises.Sum(e => e.Sets.Count)),
+            EmptySets: parsed.EmptySets,
             From: fresh.Count == 0 ? null : LocalDay(fresh.Min(w => w.StartedAt)),
             To: fresh.Count == 0 ? null : LocalDay(fresh.Max(w => w.StartedAt)),
             Duplicates: duplicates,
             MatchedExercises: matched.Count,
-            NewExercises: [.. created.Select(e => new ImportNewExerciseDto(e.Name, e.MuscleGroup, e.Modality))],
+            NewExercises: [.. created.OrderBy(e => e.MuscleGroup == "Other").ThenBy(e => e.MuscleGroup).ThenBy(e => e.Name)
+                .Select(e => new ImportNewExerciseDto(e.Name, e.MuscleGroup, e.Modality))],
             Renamed: renamed,
+            WorkoutNames: fresh.GroupBy(w => w.Name).OrderByDescending(g => g.Count())
+                .ToDictionary(g => g.Key, g => g.Count()),
+            CorrectedDates: [.. parsed.CorrectedDates.Select(c => new ImportCorrectedDateDto(c.Written, c.Corrected))],
             Errors: [.. errors.OrderBy(e => e.Line).Take(25)],
             ErrorCount: errors.Count);
 
@@ -153,19 +176,21 @@ public static class ImportEndpoints
 
         foreach (var source in fresh)
         {
-            var finishedAt = source.StartedAt.AddMinutes(source.Minutes ?? 0);
             db.Workouts.Add(new Workout
             {
                 Id = Guid.CreateVersion7(),
                 UserId = user.Id,
                 Name = source.Name,
                 StartedAt = source.StartedAt,
-                FinishedAt = finishedAt,
+                // The export carries no duration, so the workout is recorded as taking none rather than
+                // a made-up length that would feed the time-trained totals.
+                FinishedAt = source.StartedAt,
                 Exercises = [.. source.Exercises.Select((exercise, position) => new WorkoutExercise
                 {
                     Id = Guid.CreateVersion7(),
                     ExerciseId = resolved[exercise.Name].Id,
                     Position = position,
+                    Notes = Truncate(string.Join("; ", exercise.Notes), 200),
                     Sets = [.. exercise.Sets.Select((set, index) => new WorkoutSet
                     {
                         Id = Guid.CreateVersion7(),
@@ -173,9 +198,8 @@ public static class ImportEndpoints
                         WeightKg = set.WeightKg,
                         Reps = set.Reps,
                         DurationSeconds = set.DurationSeconds,
-                        IsWarmup = set.IsWarmup,
                         IsCompleted = true,
-                        CompletedAt = finishedAt,
+                        CompletedAt = source.StartedAt,
                     })],
                 })],
             });
@@ -186,6 +210,9 @@ public static class ImportEndpoints
 
         return Results.Ok(summary with { Committed = true });
     }
+
+    private static string? Truncate(string value, int max) =>
+        value.Length == 0 ? null : value.Length <= max ? value : value[..(max - 1)] + "…";
 
     /// <summary>
     /// The browser's named zone, so each date converts with its own daylight-saving offset; failing

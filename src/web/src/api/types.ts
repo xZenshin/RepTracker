@@ -290,6 +290,8 @@ export interface ImportSummary {
   rows: number
   workouts: number
   sets: number
+  /** Rows logged with 0 reps, skipped as sets never done. */
+  emptySets: number
   from?: string | null
   to?: string | null
   duplicates: number
@@ -297,6 +299,10 @@ export interface ImportSummary {
   newExercises: ImportNewExercise[]
   /** Names in the file matched to an exercise spelled differently. */
   renamed: { from: string; to: string }[]
+  /** How many new workouts get each name, e.g. { Push: 40, Pull: 38 }. */
+  workoutNames: Record<string, number>
+  /** Late-December dates the export wrote a year ahead, moved back. */
+  correctedDates: { written: string; corrected: string }[]
   errors: ImportError[]
   errorCount: number
 }

@@ -69,7 +69,7 @@ fresh clone that runs only `dotnet run` serves no UI — build the web app first
 /api/exercises   GET, POST, PATCH :id, DELETE :id
 /api/routines    GET, GET :id, POST, PUT :id, DELETE :id
 /api/workouts    GET, GET active, POST, GET :id, PATCH :id, DELETE :id
-                 POST/PUT/PATCH/DELETE .../exercises[/order|/:weId]
+                 POST/PUT/PATCH/DELETE .../exercises[/order|/:weId], POST .../exercises/:weId/swap
                  POST/PATCH/DELETE .../exercises/:weId/sets[/:setId]
 /api/stats       GET overview, calendar, exercises, exercises/:id
 /api/health      GET (unauthenticated)
@@ -132,6 +132,14 @@ added ad hoc. Routine target weight and reps are deliberately ignored here (owne
 a set copies its values into the still-empty rows after it (`logged` in `ExerciseFocus`), so the
 next set is prefilled and a blank row can never be ticked as an empty set.
 
+**Swapping an exercise mid-workout never rewrites sets already done** (2026-10-20). With nothing
+ticked yet, `POST .../exercises/:weId/swap` replaces the exercise where it stands; with sets done,
+those stay with the original - rewriting them would falsify its history and PRs - and the substitute
+is inserted after it with the remaining set count. Either way it opens on its own last time's sets.
+The picker leads with substitutes from `lib/similar.ts`, which ranks by movement family (a
+pulldown is a vertical pull, so pull-ups and chin-ups come before rows, and deadlifts never come up)
+before muscle group, since "Back" alone would offer a deadlift for a lat pulldown.
+
 **The editors avoid effect-based state sync.** `SetRow` skips its re-sync while one of its own
 inputs holds focus; `RoutineEditor` and `LogSetCard` seed during render against the id of what they
 are editing. All guard the same bug: a refetch landing mid-edit replacing a value under the cursor. This is routine on a
@@ -166,20 +174,35 @@ heaviest first, so the order of the cards is the order of importance. The set-lo
 rest-timer cards are working demos with their own state. They must never reuse `useRestTimer`,
 which would write into the real timer's `sessionStorage` slot.
 
-**Workouts import from a CSV, one row per set** (Settings, `POST /api/import/workouts`, 2026-10-20).
-The file goes up as the raw `text/csv` body, so that endpoint alone can raise the 64 KB body cap to
-2 MB, per request. Without `?commit=true` it only previews; with it, it writes everything in one
-`SaveChanges` - and nothing at all if any row has an error. Parsing is pure and separate from the
-endpoint (`Import/Csv.cs`, `Import/WorkoutCsv.cs`), which makes it the easiest thing in the app to
-put tests around. Things that will look odd:
-- *Separator and decimals are sniffed.* A European Excel writes `;` and `102,5`. The template starts
-  with `sep=,`, Excel's own hint, so it opens in columns there too; the importer skips that line.
-- *Dates convert in the browser's named zone* (`timeZone=Europe/Copenhagen`), not its current offset,
-  so a summer workout imported in winter keeps its hour and its day. Untimed workouts start at noon.
-- *Exercise names match loosely* - case, spaces, hyphens and a plural s are ignored, and a short list
-  of unambiguous shorthands (`squat`, `ohp`, `rdl`) maps to catalogue lifts. Every such match is
-  listed in the preview. Anything unmatched becomes a custom exercise.
-- *Re-importing is harmless*: a workout with the same start time and name is skipped as a duplicate.
+**Workouts import from a CSV export, one row per set** (Settings, `POST /api/import/workouts`,
+2026-10-20). The format is the owner's own export: `Date,Exercise,Set #,Reps,Weight,Duration,Distance,
+Resistance,Notes`, dates like `17-Aug-2023`. Every set on one date is one workout. The file goes up as
+the raw `text/csv` body, so that endpoint alone can raise the 64 KB body cap to 2 MB, per request.
+Without `?commit=true` it only previews; with it, it writes everything in one `SaveChanges` - and
+nothing at all if any row has an error. Parsing is pure and separate from the endpoint
+(`Import/Csv.cs`, `Import/WorkoutCsv.cs`, `Import/ExerciseGuess.cs`), which makes it the easiest
+thing in the app to put tests around; the owner's real export (7,150 rows, 563 workouts) imported
+cleanly in about a second. Things that will look odd:
+- *Late-December dates are moved back a year when the file says so.* The exporting app formatted
+  dates with the week-numbering year, so 30 December 2024 came out as 30-Dec-2025. A 29-31 December
+  date is corrected only when it is out of order with its neighbours and a year earlier puts it back in
+  sequence (`CorrectWeekYears`); every correction is listed in the preview.
+- *A set with 0 reps and no duration is skipped* as a placeholder never done (296 in the owner's
+  file). Duration `0` means "not timed". Set #, Distance and Resistance are read past.
+- *Workouts are named from what was trained* - Push, Pull, Legs, Upper body or Full body, by the
+  patterns of their sets - because the export has no workout name.
+- *New exercises get a guessed muscle group, pattern and equipment* from words in the name
+  (`ExerciseGuess`: "Bayesian Curls" is Biceps/pull). There is no screen for editing a custom
+  exercise's muscle group, so the preview lists every guess, grouped, before anything is written.
+- *Exercise names match loosely* - case, spaces, hyphens and a plural s are ignored, and a few
+  unambiguous shorthands (`squat`, `ohp`, `rdl`; not `row`) map to catalogue lifts. Every match under a
+  different name is listed in the preview.
+- *Re-importing is harmless*: a workout starting at the same instant as an existing one is skipped -
+  matched on the start alone, so it holds even if the naming rules change. Imports start at noon.
+- *Imported workouts have no duration* (the export carries none), so the detail page shows a dash
+  for time and they add nothing to time-trained totals.
+- *Separator and decimals are sniffed* (a European Excel writes `;` and `102,5`), and dates convert in
+  the browser's named zone (`timeZone=Europe/Copenhagen`), not its current offset.
 - The per-account caps (workouts, exercises per workout, sets per exercise, custom exercises) apply.
 
 **Stats has two tabs: Overview (`/stats`) and Exercises (`/stats/exercises`).** Exercises lists every

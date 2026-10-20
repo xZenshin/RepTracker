@@ -59,7 +59,8 @@ export default function WorkoutDetail() {
         <div><b className="tabular">{formatVolume(workout.totals.volumeKg, units)}</b><span className="faint small">volume</span></div>
         <div><b className="tabular">{workout.totals.sets}</b><span className="faint small">sets</span></div>
         <div><b className="tabular">{workout.totals.reps}</b><span className="faint small">reps</span></div>
-        <div><b className="tabular">{formatDuration(workout.totals.durationSeconds)}</b><span className="faint small">time</span></div>
+        {/* Imported workouts carry no duration; a dash says so where 0:00 would claim one. */}
+        <div><b className="tabular">{workout.totals.durationSeconds ? formatDuration(workout.totals.durationSeconds) : '-'}</b><span className="faint small">time</span></div>
       </div>
 
       {workout.notes ? (

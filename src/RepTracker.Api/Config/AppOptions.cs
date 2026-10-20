@@ -14,9 +14,6 @@ public class AppOptions
     /// </summary>
     public string LoginPepper { get; set; } = "";
 
-    /// <summary>Optional gate on registration. When set, callers must present it to create an account.</summary>
-    public string? SignupCode { get; set; }
-
     /// <summary>Hard ceiling on accounts. The cheapest possible defence against someone filling the database.</summary>
     public int MaxAccounts { get; set; } = 50;
 

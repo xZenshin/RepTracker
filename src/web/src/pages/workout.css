@@ -71,6 +71,24 @@
   line-height: 0.92;
 }
 
+/* Last time's summary, with the swap button on the same line. */
+.focus-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.focus-meta p {
+  min-width: 0;
+}
+
+.focus-swap {
+  flex: 0 0 auto;
+  margin-right: -8px;
+  color: var(--accent);
+}
+
 /* ---------- log card ---------- */
 
 .log-card {

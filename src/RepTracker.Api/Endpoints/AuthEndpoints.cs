@@ -23,11 +23,6 @@ public static class AuthEndpoints
     private static async Task<IResult> Register(
         RegisterRequest? body, AppDb db, Tokens tokens, AppOptions options, HttpContext ctx, CancellationToken ct)
     {
-        // An optional shared secret turns a public sign-up form into an invite-only one, which is
-        // the cheapest way to keep a personally-funded instance to people you actually know.
-        if (!string.IsNullOrEmpty(options.SignupCode) && body?.SignupCode?.Trim() != options.SignupCode)
-            return Results.Problem(detail: "A valid signup code is required.", statusCode: StatusCodes.Status403Forbidden);
-
         // A hard ceiling on rows, independent of how patient an attacker is willing to be.
         if (await db.Users.CountAsync(ct) >= options.MaxAccounts)
             return Results.Problem(

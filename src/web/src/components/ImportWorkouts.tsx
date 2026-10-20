@@ -2,23 +2,17 @@ import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useImportWorkouts } from '../api/hooks'
 import { ApiError } from '../api/client'
-import type { ImportSummary, Modality, Units } from '../api/types'
+import type { ImportNewExercise, ImportSummary, Units } from '../api/types'
 import { AlertIcon, CheckIcon } from './Icons'
 import './import-workouts.css'
 
 const MAX_BYTES = 2 * 1024 * 1024
 
-const MODALITY: Record<Modality, string> = {
-  WeightReps: 'weight and reps',
-  BodyweightReps: 'bodyweight reps',
-  Duration: 'timed',
-  DistanceDuration: 'distance',
-}
-
 /**
- * Imports workouts from a spreadsheet saved as CSV, one row per set. Choosing a file only previews
- * it - the server checks every row and says what it would add - and nothing is written until the
- * import is confirmed. A file with any error in it imports nothing.
+ * Imports a workout log exported as CSV, one row per set, in the
+ * `Date,Exercise,Set #,Reps,Weight,Duration,Distance,Resistance,Notes` format. Choosing a file only
+ * previews it - the server checks every row and says what it would add - and nothing is written
+ * until the import is confirmed. A file with any error in it imports nothing.
  */
 export default function ImportWorkouts({ units }: { units: Units }) {
   const run = useImportWorkouts()
@@ -58,9 +52,8 @@ export default function ImportWorkouts({ units }: { units: Units }) {
       <div className="card-title"><h2>Import workouts</h2></div>
 
       <p className="muted small">
-        Bring in training from a spreadsheet: one row per set, saved as CSV. Rows with the same date
-        and workout name become one workout. Weights are read in {units}, your unit setting, unless a
-        cell says otherwise, like <span className="mono">225 lb</span>.
+        Bring in a workout log exported as CSV, one row per set. Every set on the same date becomes one
+        workout. Weights are read in {units}, your unit setting.
       </p>
 
       <div className="row wrap import-actions">
@@ -80,17 +73,19 @@ export default function ImportWorkouts({ units }: { units: Units }) {
 
       <details className="import-columns">
         <summary>What goes in each column</summary>
+        <p className="faint small import-header">
+          The first row names the columns: <span className="mono">Date,Exercise,Set #,Reps,Weight,Duration,Distance,Resistance,Notes</span>
+        </p>
         <table>
           <tbody>
-            <tr><th>date</th><td>Required. <span className="mono">2026-08-14</span>, or <span className="mono">2026-08-14 07:30</span> with a time. <span className="mono">14.08.2026</span> works too.</td></tr>
-            <tr><th>exercise</th><td>Required. Matched by name to your exercise list; a name it does not know becomes a new custom exercise.</td></tr>
-            <tr><th>workout</th><td>The workout's name, like Push A.</td></tr>
-            <tr><th>weight</th><td>The load. For pull-ups and dips, the weight added to your body.</td></tr>
-            <tr><th>reps</th><td>Reps in the set. A set needs reps or a duration.</td></tr>
-            <tr><th>duration</th><td>For timed sets such as a plank: seconds, or <span className="mono">1:30</span>.</td></tr>
-            <tr><th>warmup</th><td><span className="mono">yes</span> for a warm-up set, which stats leave out.</td></tr>
-            <tr><th>muscle group</th><td>Only used when an exercise is new, so its sets count in the right place.</td></tr>
-            <tr><th>workout minutes</th><td>How long the workout took. On any one row of it is enough.</td></tr>
+            <tr><th>Date</th><td>Required. <span className="mono">17-Aug-2023</span> or <span className="mono">2023-08-17</span>. Add a time, like <span className="mono">2023-08-17 07:30</span>, to log two workouts on one day.</td></tr>
+            <tr><th>Exercise</th><td>Required. Matched by name to your exercise list. A name it does not know becomes a new exercise, with its muscle group guessed from the name.</td></tr>
+            <tr><th>Set #</th><td>Optional. Sets are kept in the order of the rows.</td></tr>
+            <tr><th>Reps</th><td>Required. A set with 0 reps was never done, and is skipped.</td></tr>
+            <tr><th>Weight</th><td>The load. 0 for a bodyweight exercise like pull-ups; for weighted dips, the weight added.</td></tr>
+            <tr><th>Duration</th><td>For timed sets such as a plank: seconds, or <span className="mono">1:30</span>. 0 when the set is not timed.</td></tr>
+            <tr><th>Distance, Resistance</th><td>Read past.</td></tr>
+            <tr><th>Notes</th><td>Kept as the note on that exercise in that workout.</td></tr>
           </tbody>
         </table>
       </details>
@@ -120,7 +115,7 @@ export default function ImportWorkouts({ units }: { units: Units }) {
         <div className="banner info import-panel import-done">
           <CheckIcon className="icon-sm" />
           <span>
-            Imported {done.workouts} workout{done.workouts === 1 ? '' : 's'} and {done.sets.toLocaleString()} sets.{' '}
+            Imported {done.workouts.toLocaleString()} workout{done.workouts === 1 ? '' : 's'} and {done.sets.toLocaleString()} sets.{' '}
             <Link to="/history">See them in History</Link>
           </span>
         </div>
@@ -170,6 +165,9 @@ function Preview({ name, summary, onImport, onCancel }: {
     )
   }
 
+  const names = Object.entries(summary.workoutNames)
+  const groups = groupByMuscle(summary.newExercises)
+
   return (
     <div className="import-panel import-preview">
       <p className="import-headline">
@@ -182,35 +180,64 @@ function Preview({ name, summary, onImport, onCancel }: {
       </p>
 
       <ul className="import-facts">
-        <li>
-          {summary.matchedExercises} exercise{summary.matchedExercises === 1 ? '' : 's'} matched to your list.
-        </li>
-        {summary.renamed.length > 0 ? (
+        {names.length > 0 ? (
           <li>
-            Matched under a different name:{' '}
-            {summary.renamed.map((pair, index) => (
-              <span key={pair.from}>
-                {index > 0 ? ', ' : ''}{pair.from} <span aria-hidden="true">→</span><span className="sr-only">as</span> <b>{pair.to}</b>
-              </span>
-            ))}
-            . If one is wrong, rename it in the file.
+            Named from what was trained: {names.map(([label, count]) => `${count.toLocaleString()} ${label}`).join(', ')}.
           </li>
         ) : null}
-        {summary.newExercises.length > 0 ? (
+        <li>
+          {summary.matchedExercises} exercise{summary.matchedExercises === 1 ? '' : 's'} matched to your list
+          {summary.renamed.length > 0 ? (
+            <>
+              , {summary.renamed.length} of them under a slightly different name:{' '}
+              {summary.renamed.map((pair, index) => (
+                <span key={pair.from}>
+                  {index > 0 ? ', ' : ''}{pair.from} <span aria-hidden="true">→</span><span className="sr-only">as</span> <b>{pair.to}</b>
+                </span>
+              ))}
+            </>
+          ) : null}
+          .
+        </li>
+        {summary.correctedDates.length > 0 ? (
           <li>
-            {summary.newExercises.length} new exercise{summary.newExercises.length === 1 ? '' : 's'} will be created:{' '}
-            {summary.newExercises.map((exercise, index) => (
-              <span key={exercise.name}>
-                {index > 0 ? ', ' : ''}<b>{exercise.name}</b> ({exercise.muscleGroup === 'Other' ? 'no muscle group' : exercise.muscleGroup}, {MODALITY[exercise.modality]})
+            Moved back a year, because the export wrote these late-December dates with the next year's
+            number:{' '}
+            {summary.correctedDates.map((date, index) => (
+              <span key={date.written}>
+                {index > 0 ? ', ' : ''}{formatDay(date.written)} <span aria-hidden="true">→</span><span className="sr-only">to</span> <b>{formatDay(date.corrected)}</b>
               </span>
             ))}
             .
           </li>
         ) : null}
+        {summary.emptySets > 0 ? (
+          <li>{summary.emptySets.toLocaleString()} set{summary.emptySets === 1 ? '' : 's'} with 0 reps will be skipped as never done.</li>
+        ) : null}
         {summary.duplicates > 0 ? (
           <li>{summary.duplicates} workout{summary.duplicates === 1 ? ' is' : 's are'} already in your history and will be skipped.</li>
         ) : null}
       </ul>
+
+      {groups.length > 0 ? (
+        <div className="import-new">
+          <p className="small">
+            <b>{summary.newExercises.length} new exercise{summary.newExercises.length === 1 ? '' : 's'}</b>, filed by
+            the muscle group guessed from each name. Check them now: a custom exercise's muscle group cannot be
+            changed after the import. If one is wrong, rename it in the file to a name from your exercise list.
+          </p>
+          <table>
+            <tbody>
+              {groups.map(([group, exercises]) => (
+                <tr key={group}>
+                  <th>{group === 'Other' ? 'No guess' : group}</th>
+                  <td>{exercises.map((e) => e.name).join(', ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
 
       <div className="row wrap" style={{ marginTop: 14 }}>
         <button className="btn primary" type="button" onClick={onImport}>
@@ -222,29 +249,37 @@ function Preview({ name, summary, onImport, onCancel }: {
   )
 }
 
+/** Muscle groups in the order the server sent them, which puts "no guess" last. */
+function groupByMuscle(exercises: ImportNewExercise[]): [string, ImportNewExercise[]][] {
+  const map = new Map<string, ImportNewExercise[]>()
+  for (const exercise of exercises) map.set(exercise.muscleGroup, [...(map.get(exercise.muscleGroup) ?? []), exercise])
+  return [...map.entries()]
+}
+
 function formatDay(iso: string | null | undefined) {
   if (!iso) return ''
   return new Date(`${iso}T00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 /**
- * A filled-in example to overwrite. The first line tells Excel which separator to split on, so it
- * opens in columns in a European locale too; the importer skips it. No byte-order mark: Excel shows
- * the separator line as text when there is one, and the template is plain ASCII anyway.
+ * A filled-in example in the import format. The first line tells Excel which separator to split on,
+ * so it opens in columns in a European locale too; the importer skips it. No byte-order mark: Excel
+ * shows the separator line as text when there is one, and the template is plain ASCII anyway.
  */
 function downloadTemplate(units: Units) {
-  const w = units === 'lb' ? { warm: 95, work: 135, squat: 225, sled: 265 } : { warm: 40, work: 60, squat: 100, sled: 120 }
+  const w = units === 'lb' ? { bench: 135, fly: 25, squat: 225 } : { bench: 60, fly: 12, squat: 100 }
   const lines = [
     'sep=,',
-    'date,workout,exercise,weight,reps,duration,warmup,muscle group,workout minutes',
-    `2026-08-14 07:30,Push A,Barbell Bench Press,${w.warm},10,,yes,,65`,
-    `2026-08-14 07:30,Push A,Barbell Bench Press,${w.work},8,,,,`,
-    `2026-08-14 07:30,Push A,Barbell Bench Press,${w.work},8,,,,`,
-    '2026-08-14 07:30,Push A,Pull-Up,,8,,,,',
-    '2026-08-14 07:30,Push A,Plank,,,1:00,,,',
-    `2026-08-16,Legs,Back Squat,${w.squat},5,,,,50`,
-    `2026-08-16,Legs,Back Squat,${w.squat},5,,,,`,
-    `2026-08-16,Legs,Sled Push,${w.sled},10,,,Quads,`,
+    'Date,Exercise,Set #,Reps,Weight,Duration,Distance,Resistance,Notes',
+    `17-Aug-2023,Barbell Bench Press,1,10,${w.bench},0,,,`,
+    `17-Aug-2023,Barbell Bench Press,2,10,${w.bench},0,,,`,
+    `17-Aug-2023,Barbell Bench Press,3,8,${w.bench},0,,,Last set was hard`,
+    `17-Aug-2023,Incline Cable Flyes,1,12,${w.fly},0,,,`,
+    `17-Aug-2023,Incline Cable Flyes,2,10,${w.fly},0,,,`,
+    '17-Aug-2023,Pull-Up,1,8,0,0,,,',
+    '17-Aug-2023,Plank,1,0,0,60,,,',
+    `19-Aug-2023,Back Squat,1,5,${w.squat},0,,,`,
+    `19-Aug-2023,Back Squat,2,5,${w.squat},0,,,`,
   ]
 
   const url = URL.createObjectURL(new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv' }))

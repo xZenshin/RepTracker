@@ -149,3 +149,10 @@ export const StopIcon = (p: Props) => (
     <rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" />
   </svg>
 )
+
+/** Two arrows passing each other: trade one exercise for another. */
+export const SwapIcon = (p: Props) => (
+  <svg {...base} {...p}>
+    <path d="M7 4 3 8l4 4M3 8h13M17 20l4-4-4-4M21 16H8" />
+  </svg>
+)

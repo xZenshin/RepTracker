@@ -90,7 +90,6 @@ This is designed to be hosted on someone's own money, so every endpoint is bound
 |---|---|---|
 | Guessing a login code | 8 attempts / IP / 15 min, over a 2⁶³ keyspace | — |
 | Sign-up spam filling the database | 3 / IP / hour, plus a hard account ceiling | `App__MaxAccounts` |
-| Unwanted sign-ups at all | Optional shared invite code | `App__SignupCode` |
 | A logged-in account flooding rows | Per-user caps on workouts, sets, routines, exercises | `App__Limits__*` |
 | General API hammering | 240 req/min per account, 60/min per anonymous IP | — |
 | Oversized payloads | 64 KB request body, 16 KB headers, 200 connections | — |
@@ -115,7 +114,6 @@ Every setting binds from the `App` section, so each is an environment variable:
 |---|---|---|
 | `ConnectionStrings__Postgres` | — | Connection string. `DATABASE_URL` (a `postgres://` URL) is accepted instead. |
 | `App__LoginPepper` | — | **Required in production.** Key the login codes are HMAC'd under. |
-| `App__SignupCode` | unset | When set, registration requires it. |
 | `App__MaxAccounts` | `50` | Hard ceiling on accounts. |
 | `App__SessionDays` | `60` | Session lifetime. |
 | `App__TrustProxyHeaders` | `false` | Read the client IP from `X-Forwarded-For`. |
@@ -144,7 +142,6 @@ docker run -p 8080:8080 \
   -e ConnectionStrings__Postgres="Host=...;Database=reptracker;Username=...;Password=..." \
   -e App__LoginPepper="$(openssl rand -base64 32)" \
   -e App__TrustProxyHeaders=true \
-  -e App__SignupCode="whatever-you-tell-your-friends" \
   reptracker
 ```
 

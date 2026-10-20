@@ -62,7 +62,7 @@ export function useMe() {
 export function useRegister() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: { displayName?: string; signupCode?: string }) =>
+    mutationFn: (body: { displayName?: string }) =>
       api<RegisterResponse>('/auth/register', { method: 'POST', body }),
     onSuccess: (data) => qc.setQueryData(keys.me, data.user),
   })
@@ -263,6 +263,19 @@ export function useAddWorkoutExercise(workoutId: string) {
   return useMutation({
     mutationFn: (exerciseId: string) =>
       api<Workout>(`/workouts/${workoutId}/exercises`, { method: 'POST', body: { exerciseId } }),
+    onSuccess: (workout) => qc.setQueryData(keys.activeWorkout, workout),
+  })
+}
+
+/**
+ * Trades a workout exercise for another. With sets already done the original keeps them and the
+ * substitute is inserted after it; otherwise it is replaced where it stands.
+ */
+export function useSwapWorkoutExercise(workoutId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ weId, exerciseId }: { weId: string; exerciseId: string }) =>
+      api<Workout>(`/workouts/${workoutId}/exercises/${weId}/swap`, { method: 'POST', body: { exerciseId } }),
     onSuccess: (workout) => qc.setQueryData(keys.activeWorkout, workout),
   })
 }

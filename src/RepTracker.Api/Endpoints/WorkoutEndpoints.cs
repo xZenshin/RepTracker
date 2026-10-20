@@ -23,6 +23,7 @@ public static class WorkoutEndpoints
         group.MapPut("/{id:guid}/exercises/order", ReorderExercises);
         group.MapPatch("/{id:guid}/exercises/{weId:guid}", UpdateExercise);
         group.MapDelete("/{id:guid}/exercises/{weId:guid}", RemoveExercise);
+        group.MapPost("/{id:guid}/exercises/{weId:guid}/swap", SwapExercise);
 
         group.MapPost("/{id:guid}/exercises/{weId:guid}/sets", AddSet);
         group.MapPatch("/{id:guid}/exercises/{weId:guid}/sets/{setId:guid}", UpdateSet);
@@ -327,6 +328,80 @@ public static class WorkoutEndpoints
         db.WorkoutExercises.Remove(we);
         await db.SaveChangesAsync(ct);
         return Results.NoContent();
+    }
+
+    /// <summary>
+    /// Trades an exercise for another mid-workout - the lat pulldown is taken, so pull-ups instead.
+    ///
+    /// Sets already done stay with the exercise they were done on: rewriting them as the substitute
+    /// would falsify its history and records. So with nothing done yet the exercise is replaced where
+    /// it stands; with some sets done, its unfinished sets are dropped and the substitute goes in
+    /// right after it. Either way the substitute opens like any added exercise, on its own last time's
+    /// sets, or - never done before - on as many empty rows as the one it replaces had left.
+    /// </summary>
+    private static async Task<IResult> SwapExercise(
+        Guid id, Guid weId, SwapWorkoutExerciseRequest body, AppDb db, HttpContext ctx,
+        ClaimsPrincipal principal, AppOptions options, CancellationToken ct)
+    {
+        var userId = principal.UserId();
+        var workout = await EditableAsync(db, userId, id, ct);
+        var we = workout?.Exercises.FirstOrDefault(x => x.Id == weId);
+        if (workout is null || we is null) return Results.NotFound();
+
+        if (body.ExerciseId == we.ExerciseId) return Validation.Problem("That is already the exercise.");
+
+        var exercise = await db.Exercises.FirstOrDefaultAsync(
+            e => e.Id == body.ExerciseId && (e.UserId == null || e.UserId == userId), ct);
+        if (exercise is null) return Validation.Problem("That exercise could not be found.");
+
+        var done = we.Sets.Where(s => s.IsCompleted).ToList();
+        var open = we.Sets.Where(s => !s.IsCompleted).ToList();
+        var remaining = open.Count(s => !s.IsWarmup);
+
+        if (done.Count > 0 && workout.Exercises.Count >= options.Limits.ExercisesPerWorkout)
+            return Validation.Problem($"A workout can hold at most {options.Limits.ExercisesPerWorkout} exercises.");
+
+        var previous = await PreviousPerformance.LoadAsync(db, userId, [exercise.Id], workout.Id, ct);
+
+        // Removed through the context as well as the collection, so EF deletes them rather than
+        // trying to orphan rows whose foreign key cannot be null.
+        db.Sets.RemoveRange(open);
+
+        if (done.Count == 0)
+        {
+            we.Sets.Clear();
+            we.ExerciseId = exercise.Id;
+            // A note was about the exercise that is no longer being done.
+            we.Notes = null;
+            // Added through the context: these carry their own ids, and reached only through a tracked
+            // parent EF would take them for existing rows and try to update them.
+            db.Sets.AddRange(CarryOver(
+                we.Id, previous.GetValueOrDefault(exercise.Id), remaining, options.Limits.SetsPerExercise));
+        }
+        else
+        {
+            foreach (var set in open) we.Sets.Remove(set);
+
+            // Make room directly after the exercise it stands in for.
+            foreach (var later in workout.Exercises.Where(x => x.Position > we.Position)) later.Position++;
+
+            var substitute = new WorkoutExercise
+            {
+                Id = Guid.CreateVersion7(),
+                WorkoutId = workout.Id,
+                ExerciseId = exercise.Id,
+                Position = we.Position + 1,
+                RestSeconds = we.RestSeconds,
+            };
+            substitute.Sets.AddRange(CarryOver(
+                substitute.Id, previous.GetValueOrDefault(exercise.Id), remaining, options.Limits.SetsPerExercise));
+            db.WorkoutExercises.Add(substitute);
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        var saved = await FullQuery(db, userId).FirstAsync(w => w.Id == id, ct);
+        return Results.Ok(await WithPreviousAsync(db, ctx, saved, ct));
     }
 
     // ---- sets ----

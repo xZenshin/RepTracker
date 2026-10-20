@@ -3,7 +3,7 @@ using RepTracker.Api.Data;
 namespace RepTracker.Api.Endpoints;
 
 // ---- auth ----
-public record RegisterRequest(string? DisplayName, string? SignupCode);
+public record RegisterRequest(string? DisplayName);
 public record RegisterResponse(string LoginCode, string Formatted, UserDto User);
 public record LoginRequest(string Code);
 public record UserDto(
@@ -64,6 +64,9 @@ public record WorkoutSummaryDto(
 
 public record UpdateWorkoutRequest(string? Name, string? Notes, bool? Finish);
 public record AddWorkoutExerciseRequest(Guid ExerciseId);
+
+/// <summary>The exercise to do instead, when the planned one's machine or bench is taken.</summary>
+public record SwapWorkoutExerciseRequest(Guid ExerciseId);
 public record UpdateWorkoutExerciseRequest(int? Position, int? RestSeconds, string? Notes);
 
 public record CreateSetRequest(
@@ -81,16 +84,25 @@ public record PagedResult<T>(List<T> Items, string? NextCursor);
 /// <summary>
 /// What an import did, or would do. <see cref="Workouts"/> and <see cref="Sets"/> count only what is
 /// new; workouts already in the account are counted in <see cref="Duplicates"/> and skipped. Line 0
-/// in an error means the file as a whole rather than one row of it.
+/// in an error means the file as a whole rather than one row of it. <see cref="EmptySets"/> counts
+/// rows logged with 0 reps, skipped as sets never done; <see cref="WorkoutNames"/> how many new
+/// workouts get each name.
 /// </summary>
 public record ImportSummaryDto(
-    bool Committed, int Rows, int Workouts, int Sets, DateOnly? From, DateOnly? To, int Duplicates,
+    bool Committed, int Rows, int Workouts, int Sets, int EmptySets, DateOnly? From, DateOnly? To, int Duplicates,
     int MatchedExercises, List<ImportNewExerciseDto> NewExercises, List<ImportRenamedDto> Renamed,
+    Dictionary<string, int> WorkoutNames, List<ImportCorrectedDateDto> CorrectedDates,
     List<ImportErrorDto> Errors, int ErrorCount);
 
 public record ImportNewExerciseDto(string Name, string MuscleGroup, Modality Modality);
 
 /// <summary>A name in the file that was matched to an exercise spelled differently, like "Squat" to "Back Squat".</summary>
 public record ImportRenamedDto(string From, string To);
+
+/// <summary>
+/// A date moved back a year because the export wrote late December with the next year's number, a
+/// week-numbering bug. Listed so the correction is seen rather than silent.
+/// </summary>
+public record ImportCorrectedDateDto(DateOnly Written, DateOnly Corrected);
 
 public record ImportErrorDto(int Line, string Message);

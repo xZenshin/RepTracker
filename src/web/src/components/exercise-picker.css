@@ -88,3 +88,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* The suggested substitutes, set apart from the full list that follows. */
+.picker-similar > h3 {
+  color: var(--accent);
+}

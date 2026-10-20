@@ -47,7 +47,7 @@
 }
 
 .import-columns th {
-  width: 9.5rem;
+  width: 10.5rem;
   padding-right: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -125,4 +125,49 @@
 .import-done a {
   font-weight: 700;
   text-decoration: underline;
+}
+
+.import-header {
+  margin-top: 10px;
+}
+
+/* New exercises, one row per guessed muscle group. */
+.import-new {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.import-new p {
+  color: var(--text-dim);
+}
+
+.import-new b {
+  color: var(--text);
+}
+
+.import-new table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.import-new th,
+.import-new td {
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.import-new th {
+  width: 7.5rem;
+  padding-right: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.import-new td {
+  color: var(--text-dim);
 }

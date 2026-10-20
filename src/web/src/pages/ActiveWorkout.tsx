@@ -1,26 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  useActiveWorkout, useAddSet, useAddWorkoutExercise, useDeleteSet, useDeleteWorkout,
-  useMe, useRemoveWorkoutExercise, useUpdateSet, useUpdateWorkout, useUpdateWorkoutExercise,
+  useActiveWorkout, useAddSet, useAddWorkoutExercise, useDeleteSet, useDeleteWorkout, useExercises,
+  useMe, useRemoveWorkoutExercise, useSwapWorkoutExercise, useUpdateSet, useUpdateWorkout,
+  useUpdateWorkoutExercise,
 } from '../api/hooks'
-import type { Modality, PreviousSet, Units, Workout, WorkoutExercise, WorkoutSet } from '../api/types'
+import type { Exercise, Modality, PreviousSet, Units, Workout, WorkoutExercise, WorkoutSet } from '../api/types'
 import { ApiError } from '../api/client'
 import { formatVolume, formatWeight, toDisplay, toKg, weightStep } from '../lib/units'
 import { formatDuration, formatRelative } from '../lib/time'
 import { useElapsed } from '../lib/useElapsed'
 import { computeTotals } from '../lib/totals'
 import { useRestTimer } from '../lib/useRestTimer'
+import { similarExercises } from '../lib/similar'
 import ExercisePicker from '../components/ExercisePicker'
 import Sheet from '../components/Sheet'
 import {
   BackIcon, CheckIcon, ListIcon, MinusCircleIcon, MoreIcon, PlusCircleIcon, PlusIcon, SkipIcon,
-  StopIcon, TimerIcon, TrashIcon,
+  StopIcon, SwapIcon, TimerIcon, TrashIcon,
 } from '../components/Icons'
 import './workout.css'
 
 type RestTimer = ReturnType<typeof useRestTimer>
-type OpenSheet = 'picker' | 'exercises' | 'menu' | 'finish' | null
+type OpenSheet = 'picker' | 'swap' | 'exercises' | 'menu' | 'finish' | null
 
 // Which exercise is on screen. Kept in sessionStorage, like the rest timer, so a reload mid-workout
 // lands back on the same exercise rather than jumping to the first unfinished one.
@@ -39,6 +41,8 @@ export default function ActiveWorkout() {
   const [sheet, setSheet] = useState<OpenSheet>(null)
 
   const addExercise = useAddWorkoutExercise(workout?.id ?? '')
+  const swapExercise = useSwapWorkoutExercise(workout?.id ?? '')
+  const { data: catalogue } = useExercises()
 
   useEffect(() => {
     if (!isPending && !workout) navigate('/', { replace: true })
@@ -96,6 +100,7 @@ export default function ActiveWorkout() {
           count={exercises.length}
           units={units}
           weightStep={weightStep(units, user?.weightStepKg)}
+          onSwap={() => setSheet('swap')}
           onLogged={() => {
             // Pin the exercise once you log against it, so finishing its last set doesn't make the
             // "first unfinished" fallback whisk you off to the next one before you choose to go.
@@ -155,11 +160,38 @@ export default function ActiveWorkout() {
         />
       ) : null}
 
+      {sheet === 'swap' && current ? (
+        <ExercisePicker
+          usedIds={new Set(exercises.map((we) => we.exerciseId))}
+          replacing={{
+            id: current.exerciseId,
+            name: current.exerciseName,
+            similar: swapCandidates(current, catalogue ?? []),
+          }}
+          onClose={() => setSheet(null)}
+          onPick={(exercise) => {
+            const replaced = current.id
+            swapExercise.mutate({ weId: replaced, exerciseId: exercise.id }, {
+              onSuccess: (updated) => {
+                // Replaced where it stood, or - with sets already done - followed by the substitute.
+                const same = updated.exercises.find((we) => we.id === replaced)
+                const target = same && same.exerciseId === exercise.id
+                  ? same
+                  : updated.exercises[updated.exercises.findIndex((we) => we.id === replaced) + 1]
+                if (target) select(target.id)
+              },
+            })
+            setSheet(null)
+          }}
+        />
+      ) : null}
+
       {sheet === 'menu' ? (
         <WorkoutMenu
           workoutId={workout.id}
           exercise={current}
           onClose={() => setSheet(null)}
+          onSwap={() => setSheet('swap')}
           onFinish={() => setSheet('finish')}
         />
       ) : null}
@@ -176,8 +208,17 @@ export default function ActiveWorkout() {
   )
 }
 
+/**
+ * Substitutes for the exercise on screen. The workout carries only the exercise's id and name, so
+ * its muscle group and pattern come from the exercise list; until that has loaded there are none.
+ */
+function swapCandidates(current: WorkoutExercise, catalogue: Exercise[]) {
+  const target = catalogue.find((exercise) => exercise.id === current.exerciseId)
+  return target ? similarExercises(target, catalogue) : []
+}
+
 function ExerciseFocus({
-  workoutId, workoutName, exercise, position, count, units, weightStep, onLogged,
+  workoutId, workoutName, exercise, position, count, units, weightStep, onLogged, onSwap,
 }: {
   workoutId: string
   workoutName: string
@@ -187,6 +228,7 @@ function ExerciseFocus({
   units: Units
   weightStep: number
   onLogged: () => void
+  onSwap: () => void
 }) {
   const previous = exercise.previous
   const fields = fieldsFor(exercise.modality, units, weightStep)
@@ -213,11 +255,18 @@ function ExerciseFocus({
         {workoutName} · {position} of {count}
       </p>
       <h1 className="focus-title">{exercise.exerciseName}</h1>
-      <p className="faint small">
-        {previous
-          ? `Last time ${formatRelative(previous.performedAt)} - ${summarisePrevious(previous.sets, units)}`
-          : 'First time logging this'}
-      </p>
+      <div className="focus-meta">
+        <p className="faint small">
+          {previous
+            ? `Last time ${formatRelative(previous.performedAt)} - ${summarisePrevious(previous.sets, units)}`
+            : 'First time logging this'}
+        </p>
+        {/* Right under the name, because a taken machine is a now problem, not a menu one. */}
+        <button className="btn ghost sm focus-swap" type="button" onClick={onSwap}>
+          <SwapIcon className="icon-sm" />
+          Swap
+        </button>
+      </div>
 
       <LogSetCard workoutId={workoutId} exercise={exercise} units={units} fields={fields} onLogged={logged} />
 
@@ -602,11 +651,12 @@ function ExercisesSheet({
 }
 
 function WorkoutMenu({
-  workoutId, exercise, onClose, onFinish,
+  workoutId, exercise, onClose, onSwap, onFinish,
 }: {
   workoutId: string
   exercise: WorkoutExercise | undefined
   onClose: () => void
+  onSwap: () => void
   onFinish: () => void
 }) {
   const removeExercise = useRemoveWorkoutExercise(workoutId)
@@ -632,6 +682,11 @@ function WorkoutMenu({
               ))}
             </select>
           </label>
+
+          <button className="btn block" type="button" onClick={onSwap} style={{ marginBottom: 10 }}>
+            <SwapIcon className="icon-sm" />
+            Swap for something similar
+          </button>
 
           <button
             className="btn danger block"
