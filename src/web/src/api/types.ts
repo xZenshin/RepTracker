@@ -160,13 +160,21 @@ export interface Consistency {
   totalWorkouts: number
 }
 
-export interface WeekPoint {
-  weekStart: string
+export interface VolumePoint {
+  /** The day, or the Monday of the week, this point covers. */
+  start: string
   workouts: number
   volumeKg: number
   sets: number
   durationSeconds: number
-  volumeRolling4W: number
+  volumeRolling: number
+}
+
+export interface VolumeSeries {
+  bucket: 'day' | 'week'
+  /** How many points the rolling average spans. */
+  rollingPoints: number
+  points: VolumePoint[]
 }
 
 export type MuscleVerdict = 'untrained' | 'low' | 'on target' | 'high'
@@ -219,7 +227,7 @@ export interface Neglected {
 export interface Overview {
   totals: PeriodTotals
   consistency: Consistency
-  weekly: WeekPoint[]
+  volume: VolumeSeries
   muscleGroups: MuscleGroupLoad[]
   balance: Balance
   recentRecords: PersonalRecord[]

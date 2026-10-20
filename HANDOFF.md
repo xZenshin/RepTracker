@@ -165,7 +165,13 @@ or `autoFocus` (the exercise picker's search) never sticks.
 
 **Stats bucket weeks in the browser's timezone.** The client sends `offsetMinutes`; the server
 clamps it to ±840. Weeks start Monday. The dashboard's periods read as months (1M/3M/6M/12M) but
-are whole weeks underneath — 4, 13, 26, 52 — because every section buckets by week.
+are whole weeks underneath — 4, 13, 26, 52 — because the window always starts on a Monday.
+
+**The volume chart switches from weekly to daily bars on short periods** (owner decision,
+2026-10-20). Up to 13 weeks (`DailyVolumeMaxWeeks` in `StatsService`) it is one bar per day with a
+7-day average; above that, one bar per week with a 4-week average. The server picks, and says which
+in `volume.bucket`. A daily series ends today, not on Sunday, so 1M is 22-28 bars depending on the
+weekday. The 7-day line sits well under the bars on purpose: it averages over rest days too.
 
 **The consistency calendar follows the selected period and is binary.** One column per week of the
 period, each day trained or not; set counts deliberately do not shade it (owner decision). The
@@ -311,3 +317,7 @@ and hand the `rt_session` cookie to the browser context instead.
 
 The compose Postgres is still running and holds the demo account, with no workout open (the last
 one was finished on 2026-10-19). `docker compose down -v` resets it; re-run `seed-demo` afterwards.
+
+**Demo account login code: `2395 9877 7198 1929 7123`.** This is a throwaway account in the local
+dev database only, signed with the Development pepper, so it is worthless anywhere else. A reseed
+mints a new code; replace this one when that happens.

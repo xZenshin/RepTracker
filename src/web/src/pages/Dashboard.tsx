@@ -4,7 +4,7 @@ import {
   Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { useCalendar, useMe, useOverview } from '../api/hooks'
-import type { CalendarDay, MuscleGroupLoad, Units, WeekPoint } from '../api/types'
+import type { CalendarDay, MuscleGroupLoad, Units, VolumeSeries } from '../api/types'
 import { formatVolume, toDisplay } from '../lib/units'
 import { formatHours, formatRelative, isoDate } from '../lib/time'
 import { AlertIcon, FlameIcon, TrophyIcon } from '../components/Icons'
@@ -93,10 +93,10 @@ export default function Dashboard() {
 
           <section className="card">
             <div className="card-title">
-              <h2>Weekly volume</h2>
-              <span className="hint">Total load lifted each week</span>
+              <h2>Volume</h2>
+              <span className="hint">Total load lifted each {data.volume.bucket}</span>
             </div>
-            <VolumeChart data={data.weekly} units={units} />
+            <VolumeChart series={data.volume} units={units} />
           </section>
 
           <section className="card">
@@ -184,22 +184,32 @@ export default function Dashboard() {
   )
 }
 
-function VolumeChart({ data, units }: { data: WeekPoint[]; units: Units }) {
-  const rows = data.map((point) => ({
-    week: point.weekStart,
-    label: new Date(point.weekStart).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
-    volume: Math.round(toDisplay(point.volumeKg, units) ?? 0),
-    rolling: Math.round(toDisplay(point.volumeRolling4W, units) ?? 0),
-    workouts: point.workouts,
-    sets: point.sets,
-  }))
+function VolumeChart({ series, units }: { series: VolumeSeries; units: Units }) {
+  const daily = series.bucket === 'day'
+  const average = `${series.rollingPoints}-${series.bucket} average`
+
+  const rows = series.points.map((point) => {
+    // A date-only string parses as UTC midnight, which is the previous day west of Greenwich.
+    const date = new Date(`${point.start}T00:00`)
+    return {
+      start: point.start,
+      label: date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+      heading: daily
+        ? date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+        : `Week of ${date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`,
+      volume: Math.round(toDisplay(point.volumeKg, units) ?? 0),
+      rolling: Math.round(toDisplay(point.volumeRolling, units) ?? 0),
+      workouts: point.workouts,
+      sets: point.sets,
+    }
+  })
 
   return (
     <>
       {/* Two series, so identity never rests on colour alone. */}
       <div className="viz-legend">
-        <span><i style={{ background: 'var(--series-1)' }} /> Weekly volume</span>
-        <span><i className="line" style={{ background: 'var(--series-2)' }} /> 4-week average</span>
+        <span><i style={{ background: 'var(--series-1)' }} /> {daily ? 'Daily' : 'Weekly'} volume</span>
+        <span><i className="line" style={{ background: 'var(--series-2)' }} /> {average}</span>
       </div>
 
       <div className="chart-frame">
@@ -228,18 +238,18 @@ function VolumeChart({ data, units }: { data: WeekPoint[]; units: Units }) {
             />
             <Tooltip
               cursor={{ fill: 'var(--surface-2)' }}
-              content={({ active, payload, label }) => {
+              content={({ active, payload }) => {
                 if (!active || !payload?.length) return null
                 const row = payload[0].payload as (typeof rows)[number]
                 return (
                   <div className="viz-tooltip">
-                    <div className="head">Week of {label}</div>
+                    <div className="head">{row.heading}</div>
                     <div className="row">
                       <span><i className="swatch" style={{ background: 'var(--series-1)', display: 'inline-block', marginRight: 6 }} />Volume</span>
                       <b className="tabular">{row.volume.toLocaleString()} {units}</b>
                     </div>
                     <div className="row">
-                      <span><i className="swatch" style={{ background: 'var(--series-2)', display: 'inline-block', marginRight: 6 }} />4-week avg</span>
+                      <span><i className="swatch" style={{ background: 'var(--series-2)', display: 'inline-block', marginRight: 6 }} />{series.rollingPoints}-{series.bucket} avg</span>
                       <b className="tabular">{row.rolling.toLocaleString()} {units}</b>
                     </div>
                     <div className="row muted">
@@ -250,8 +260,9 @@ function VolumeChart({ data, units }: { data: WeekPoint[]; units: Units }) {
                 )
               }}
             />
-            {/* 4px rounded top, anchored to the baseline; the 2px gap comes from barCategoryGap. */}
-            <Bar dataKey="volume" fill="var(--series-1)" radius={[4, 4, 0, 0]} maxBarSize={34}
+            {/* Rounded top, anchored to the baseline; the gap comes from barCategoryGap. Daily bars
+                over three months are a few pixels wide, too narrow for a 4px radius. */}
+            <Bar dataKey="volume" fill="var(--series-1)" radius={daily ? [2, 2, 0, 0] : [4, 4, 0, 0]} maxBarSize={34}
             isAnimationActive={false}
           />
             <Line

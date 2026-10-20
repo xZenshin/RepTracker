@@ -22,6 +22,9 @@ public class StatsService(AppDb db)
     /// <summary>Rest days are healthy; three weeks away from a movement in your own plan is drift.</summary>
     private const int NeglectedDays = 21;
 
+    /// <summary>Periods up to this long chart volume per day; longer ones per week.</summary>
+    private const int DailyVolumeMaxWeeks = 13;
+
     private const decimal WeeklySetTargetLow = 10m;
     private const decimal WeeklySetTargetHigh = 20m;
 
@@ -50,7 +53,7 @@ public class StatsService(AppDb db)
         return new OverviewDto(
             Totals(workouts, windowSets, since, bodyWeightKg, weeks),
             Consistency(workouts, offsetMinutes, currentWeek),
-            Weekly(workouts, windowSets, bodyWeightKg, firstWeek, weeks, offsetMinutes),
+            VolumeSeries(workouts, windowSets, bodyWeightKg, firstWeek, weeks, now, offsetMinutes),
             MuscleGroups(windowSets, bodyWeightKg, weeks),
             Balance(windowSets),
             [.. records.Where(r => r.AchievedAt >= since).OrderByDescending(r => r.AchievedAt).Take(15)],
@@ -206,41 +209,51 @@ public class StatsService(AppDb db)
             workouts.Count);
     }
 
-    private static List<WeekPointDto> Weekly(
+    private static VolumeSeriesDto VolumeSeries(
         List<WorkoutRow> workouts, List<SetRow> sets, decimal? bodyWeightKg,
-        DateOnly firstWeek, int weeks, int offsetMinutes)
+        DateOnly firstWeek, int weeks, DateTimeOffset now, int offsetMinutes)
     {
-        var setsByWeek = sets
-            .GroupBy(s => WeekStartOf(s.StartedAt, offsetMinutes))
+        // A short period in weeks is only a handful of bars, so it is charted by day instead. A daily
+        // series stops at today: days that have not happened yet are not rest days.
+        var daily = weeks <= DailyVolumeMaxWeeks;
+        var stepDays = daily ? 1 : 7;
+        var rollingPoints = daily ? 7 : 4;
+        var count = daily ? LocalDate(now, offsetMinutes).DayNumber - firstWeek.DayNumber + 1 : weeks;
+
+        DateOnly BucketOf(DateTimeOffset at) =>
+            daily ? LocalDate(at, offsetMinutes) : WeekStartOf(at, offsetMinutes);
+
+        var setsByBucket = sets
+            .GroupBy(s => BucketOf(s.StartedAt))
             .ToDictionary(g => g.Key, g => (Volume: g.Sum(s => Volume(s, bodyWeightKg)), Sets: g.Count()));
 
-        var workoutsByWeek = workouts
-            .GroupBy(w => WeekStartOf(w.StartedAt, offsetMinutes))
+        var workoutsByBucket = workouts
+            .GroupBy(w => BucketOf(w.StartedAt))
             .ToDictionary(
                 g => g.Key,
                 g => (Count: g.Count(),
                       Seconds: g.Where(w => w.FinishedAt is not null)
                                .Sum(w => (int)(w.FinishedAt!.Value - w.StartedAt).TotalSeconds)));
 
-        // Weeks with no training are emitted as zeroes rather than skipped: a gap in a volume chart
-        // should be visible as a gap, not smoothed over by the next bar sliding left.
-        var points = new List<WeekPointDto>(weeks);
-        var volumes = new List<decimal>(weeks);
+        // Days and weeks with no training are emitted as zeroes rather than skipped: a gap in a volume
+        // chart should be visible as a gap, not smoothed over by the next bar sliding left.
+        var points = new List<VolumePointDto>(count);
+        var volumes = new List<decimal>(count);
 
-        for (var i = 0; i < weeks; i++)
+        for (var i = 0; i < count; i++)
         {
-            var week = firstWeek.AddDays(7 * i);
-            var s = setsByWeek.GetValueOrDefault(week);
-            var w = workoutsByWeek.GetValueOrDefault(week);
+            var start = firstWeek.AddDays(stepDays * i);
+            var s = setsByBucket.GetValueOrDefault(start);
+            var w = workoutsByBucket.GetValueOrDefault(start);
 
             volumes.Add(s.Volume);
-            var rolling = volumes.Skip(Math.Max(0, volumes.Count - 4)).Average();
+            var rolling = volumes.Skip(Math.Max(0, volumes.Count - rollingPoints)).Average();
 
-            points.Add(new WeekPointDto(
-                week, w.Count, Math.Round(s.Volume, 1), s.Sets, w.Seconds, Math.Round(rolling, 1)));
+            points.Add(new VolumePointDto(
+                start, w.Count, Math.Round(s.Volume, 1), s.Sets, w.Seconds, Math.Round(rolling, 1)));
         }
 
-        return points;
+        return new VolumeSeriesDto(daily ? "day" : "week", rollingPoints, points);
     }
 
     private static List<MuscleGroupLoadDto> MuscleGroups(List<SetRow> sets, decimal? bodyWeightKg, int weeks)

@@ -5,7 +5,7 @@ namespace RepTracker.Api.Stats;
 public record OverviewDto(
     PeriodTotals Totals,
     ConsistencyDto Consistency,
-    List<WeekPointDto> Weekly,
+    VolumeSeriesDto Volume,
     List<MuscleGroupLoadDto> MuscleGroups,
     BalanceDto Balance,
     List<RecordDto> RecentRecords,
@@ -22,8 +22,14 @@ public record PeriodTotals(
 public record ConsistencyDto(
     int CurrentWeekStreak, int LongestWeekStreak, int WorkoutsThisWeek, int ActiveWeeks, int TotalWorkouts);
 
-public record WeekPointDto(
-    DateOnly WeekStart, int Workouts, decimal VolumeKg, int Sets, int DurationSeconds, decimal VolumeRolling4W);
+/// <summary>
+/// Volume over the period, one point per <see cref="Bucket"/> ("day" or "week"). The rolling average
+/// spans the last <see cref="RollingPoints"/> points: a week of days, or a month of weeks.
+/// </summary>
+public record VolumeSeriesDto(string Bucket, int RollingPoints, List<VolumePointDto> Points);
+
+public record VolumePointDto(
+    DateOnly Start, int Workouts, decimal VolumeKg, int Sets, int DurationSeconds, decimal VolumeRolling);
 
 /// <summary>
 /// Hard sets per week is the number most closely tied to hypertrophy, which is why it is reported
