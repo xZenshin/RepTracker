@@ -34,7 +34,7 @@ public static class WorkoutEndpoints
     /// <summary>History, newest first, walked with a keyset cursor on start time.</summary>
     private static async Task<IResult> List(
         AppDb db, HttpContext ctx, ClaimsPrincipal principal, CancellationToken ct,
-        int? limit = null, DateTimeOffset? before = null)
+        int? limit = null, DateTimeOffset? before = null, DateTimeOffset? after = null)
     {
         var userId = principal.UserId();
         var take = Validation.PageSize(limit, fallback: 20, max: 100);
@@ -49,6 +49,9 @@ public static class WorkoutEndpoints
         // Normalised because a caller may send a cursor carrying its own zone, and Npgsql binds
         // timestamptz parameters only at zero offset.
         if (before is { } cursor) query = query.Where(w => w.StartedAt < cursor.ToUniversalTime());
+
+        // With `before`, bounds one calendar month for the history page's calendar.
+        if (after is { } from) query = query.Where(w => w.StartedAt >= from.ToUniversalTime());
 
         // One row beyond the page tells us whether a cursor is worth handing back.
         var rows = await query.OrderByDescending(w => w.StartedAt).Take(take + 1).ToListAsync(ct);

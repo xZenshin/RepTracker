@@ -3,7 +3,7 @@ import { NavLink, Navigate, Route, Routes, useMatch, useNavigate } from 'react-r
 import { useActiveWorkout, useMe } from './api/hooks'
 import { ChartIcon, DumbbellIcon, HistoryIcon, SettingsIcon } from './components/Icons'
 import { useIsDesktop } from './lib/useMediaQuery'
-import Login, { CodeIssued } from './pages/Login'
+import Login, { CodeIssued, type Mode } from './pages/Login'
 import Train from './pages/Train'
 import ActiveWorkout from './pages/ActiveWorkout'
 import History from './pages/History'
@@ -14,6 +14,8 @@ import Settings from './pages/Settings'
 // The charting library is a third of the bundle and only the stats pages use it. Splitting it out
 // keeps the screen you open in the gym small, which is the one loading on bad signal.
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+// Only signed-out visitors see the landing page, so signed-in users never download it.
+const Landing = lazy(() => import('./pages/Landing'))
 const ExerciseList = lazy(() => import('./pages/ExerciseList'))
 const ExerciseDetail = lazy(() => import('./pages/ExerciseDetail'))
 
@@ -29,6 +31,9 @@ export default function App() {
   // the user will ever be shown is destroyed before it paints.
   const [issuedCode, setIssuedCode] = useState<string | null>(null)
 
+  // Signed out, the landing page comes first; its buttons open the sign-in card in either mode.
+  const [auth, setAuth] = useState<Mode | null>(null)
+
   if (isPending) return <BootSplash />
 
   if (issuedCode) {
@@ -43,7 +48,19 @@ export default function App() {
     )
   }
 
-  if (!user) return <Login onIssued={setIssuedCode} />
+  if (!user) {
+    if (auth) {
+      return <Login key={auth} initialMode={auth} onIssued={setIssuedCode} onBack={() => setAuth(null)} />
+    }
+    return (
+      <Suspense fallback={<BootSplash />}>
+        <Landing onStart={setAuth} />
+      </Suspense>
+    )
+  }
+
+  // Forget which form was used, so signing out lands on the landing page rather than back on it.
+  if (auth) setAuth(null)
 
   return (
     <div className={`app${inWorkout ? ' focus-mode' : ''}`}>

@@ -1,0 +1,674 @@
+/*
+  The landing page: a bar running down the page, with each feature clamped to it by a plate.
+
+  Plates are the competition colours, so the page reads as a gym before a word of it is read. The
+  floor, cards and type are the app's own tokens from theme.css, so the page hands over to the app
+  without a change of look. Only the fleck texture, the steel and the plates belong to this page.
+*/
+
+.landing {
+  --floor: var(--bg);
+  --fleck-a: rgb(255 255 255 / 0.045);
+  --fleck-b: rgb(120 150 190 / 0.07);
+  --card: var(--surface);
+  --card-line: var(--border);
+  --ink: var(--text);
+  --ink-dim: var(--text-dim);
+
+  --steel-hi: #e3e6ea;
+  --steel: #a9aeb6;
+  --steel-lo: #5d636c;
+
+  --plate-red: #d8283b;
+  --plate-blue: #2763cf;
+  --plate-yellow: #f1b51c;
+  --plate-green: #2c9a5b;
+  --plate-white: #eceef0;
+  --plate-edge: rgb(0 0 0 / 0.35);
+
+  min-height: 100dvh;
+  overflow-x: clip;
+  color: var(--ink);
+  background-color: var(--floor);
+  /* Rubber flooring: two scatters of fleck at sizes that never line up into a visible grid. */
+  background-image:
+    radial-gradient(circle at 30% 40%, var(--fleck-a) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 70% 20%, var(--fleck-b) 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 50% 80%, var(--fleck-a) 0 0.8px, transparent 1.3px);
+  background-size: 23px 29px, 41px 37px, 17px 19px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) .landing {
+    --fleck-a: rgb(40 44 52 / 0.06);
+    --fleck-b: rgb(255 255 255 / 0.9);
+
+    --steel-hi: #f4f5f7;
+    --steel: #b4b9c1;
+    --steel-lo: #6d737c;
+
+    --plate-white: #ffffff;
+    --plate-edge: rgb(20 24 30 / 0.28);
+  }
+}
+
+.landing .tone-red { --plate: var(--plate-red); }
+.landing .tone-blue { --plate: var(--plate-blue); }
+.landing .tone-yellow { --plate: var(--plate-yellow); }
+.landing .tone-green { --plate: var(--plate-green); }
+.landing .tone-white { --plate: var(--plate-white); }
+
+/* ---------- top and hero ---------- */
+
+.lp-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 18px 20px 0;
+}
+
+.lp-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.lp-brand .mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.lp-hero {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: clamp(40px, 9vw, 96px) 20px 0;
+}
+
+.lp-hero h1 {
+  max-width: 15ch;
+  font-family: var(--display);
+  font-size: clamp(3.2rem, 10.5vw, 8.4rem);
+  font-weight: 850;
+  line-height: 0.86;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.lp-lede {
+  max-width: 34rem;
+  margin-top: 22px;
+  font-size: clamp(1.05rem, 1.6vw, 1.2rem);
+  line-height: 1.55;
+  color: var(--ink-dim);
+  text-wrap: pretty;
+}
+
+.lp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 26px;
+}
+
+.lp-bar {
+  display: block;
+  width: 100%;
+  max-width: 1040px;
+  margin: clamp(36px, 6vw, 64px) auto 0;
+  overflow: visible;
+}
+
+.lp-bar-plate {
+  fill: var(--plate);
+  stroke: var(--plate-edge);
+  stroke-width: 1;
+}
+
+/* ---------- the bar down the page ---------- */
+
+.lp-features {
+  position: relative;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 72px 20px 40px;
+}
+
+/* The bar itself, knurled the length of the page. */
+.lp-features::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 40px;
+  left: 50%;
+  width: 12px;
+  translate: -50% 0;
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 3px, rgb(0 0 0 / 0.16) 3px 4.5px),
+    linear-gradient(90deg, var(--steel-lo), var(--steel-hi) 42%, var(--steel) 60%, var(--steel-lo));
+}
+
+.lp-collar {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  width: 54px;
+  height: 18px;
+  translate: -50% 0;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--steel-lo), var(--steel-hi) 45%, var(--steel-lo));
+}
+
+.lp-feature {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 160px 1fr;
+  align-items: start;
+  /* The rows overlap, so each row's empty half lies over the card above it. Only the card itself
+     takes clicks, or the next row would swallow taps on the buttons at the bottom of this one. */
+  pointer-events: none;
+}
+
+.lp-feature .lp-card {
+  pointer-events: auto;
+}
+
+/* Alternate sides overlap vertically, so the page zig-zags rather than stacking in two rows. */
+.lp-feature + .lp-feature {
+  margin-top: -110px;
+}
+
+.lp-plate {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
+  width: var(--plate-wide);
+  height: var(--plate-thick);
+  margin-top: 46px;
+  border-radius: 5px;
+  background: var(--plate);
+  box-shadow: inset 0 0 0 1px var(--plate-edge), inset 0 -3px 0 rgb(0 0 0 / 0.18);
+  position: relative;
+  z-index: 1;
+}
+
+.lp-card {
+  grid-row: 1;
+  position: relative;
+  padding: 28px 28px 24px;
+  border: 1px solid var(--card-line);
+  border-radius: 22px;
+  background: var(--card);
+}
+
+.lp-feature.left .lp-card { grid-column: 1; }
+.lp-feature.right .lp-card { grid-column: 3; }
+
+/* The coloured edge facing the bar ties each card to its plate. */
+.lp-card::before {
+  content: '';
+  position: absolute;
+  top: 40px;
+  width: 4px;
+  height: 46px;
+  border-radius: 4px;
+  background: var(--plate);
+  box-shadow: 0 0 0 1px var(--plate-edge);
+}
+
+.lp-feature.left .lp-card::before { right: -2px; }
+.lp-feature.right .lp-card::before { left: -2px; }
+
+.lp-card h2 {
+  max-width: 16ch;
+  font-family: var(--display);
+  font-size: clamp(2rem, 3.4vw, 2.75rem);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.lp-card > p {
+  max-width: 44ch;
+  margin-top: 12px;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--ink-dim);
+}
+
+.lp-mock {
+  margin-top: 20px;
+}
+
+/* ---------- end and footer ---------- */
+
+.lp-end {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+  text-align: center;
+}
+
+.lp-end h2 {
+  font-family: var(--display);
+  font-size: clamp(2.6rem, 7vw, 5rem);
+  font-weight: 850;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.lp-end .lp-lede {
+  margin-inline: auto;
+}
+
+.lp-end .lp-actions {
+  justify-content: center;
+}
+
+.lp-foot {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--ink-dim);
+}
+
+/* ---------- motion: loading the bar ---------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .lp-bar-plate,
+  .lp-bar-clamp {
+    transform-box: fill-box;
+    animation: lp-load-left 700ms cubic-bezier(0.3, 0.7, 0.2, 1) both;
+    animation-delay: calc(250ms + var(--i, 0) * 130ms);
+  }
+
+  .lp-bar-plate.from-right,
+  .lp-bar-clamp.from-right {
+    animation-name: lp-load-right;
+  }
+
+  .lp-bar-clamp {
+    animation-delay: 1000ms;
+  }
+
+  /* Slides along the sleeve, knocks the plate before it, and settles. */
+  @keyframes lp-load-left {
+    0% { transform: translateX(-300px); opacity: 0; }
+    20% { opacity: 1; }
+    82% { transform: translateX(0); }
+    90% { transform: translateX(-5px); }
+    100% { transform: translateX(0); }
+  }
+
+  @keyframes lp-load-right {
+    0% { transform: translateX(300px); opacity: 0; }
+    20% { opacity: 1; }
+    82% { transform: translateX(0); }
+    90% { transform: translateX(5px); }
+    100% { transform: translateX(0); }
+  }
+
+  .lp-feature .lp-plate {
+    transition: transform 500ms cubic-bezier(0.3, 0.7, 0.2, 1), opacity 300ms;
+  }
+
+  .lp-feature .lp-card {
+    transition: transform 650ms cubic-bezier(0.3, 0.7, 0.2, 1), opacity 450ms;
+  }
+
+  .lp-feature:not(.loaded) .lp-plate {
+    transform: translateY(-60px) scaleX(0.6);
+    opacity: 0;
+  }
+
+  .lp-feature.left:not(.loaded) .lp-card {
+    transform: translateX(-48px);
+    opacity: 0;
+  }
+
+  .lp-feature.right:not(.loaded) .lp-card {
+    transform: translateX(48px);
+    opacity: 0;
+  }
+
+  /* The card follows its plate onto the bar. */
+  .lp-feature.loaded .lp-card {
+    transition-delay: 120ms;
+  }
+}
+
+/* ---------- phones: the bar moves to the left edge ---------- */
+
+@media (max-width: 760px) {
+  .lp-features {
+    padding: 48px 16px 40px;
+  }
+
+  .lp-features::before {
+    left: 30px;
+    width: 9px;
+  }
+
+  .lp-collar {
+    left: 30px;
+    width: 34px;
+    height: 14px;
+  }
+
+  .lp-feature {
+    grid-template-columns: 30px 1fr;
+    column-gap: 14px;
+  }
+
+  .lp-feature + .lp-feature {
+    margin-top: 28px;
+  }
+
+  .lp-plate {
+    grid-column: 1;
+    width: calc(var(--plate-wide) * 0.36);
+    margin-top: 36px;
+  }
+
+  .lp-feature.left .lp-card,
+  .lp-feature.right .lp-card {
+    grid-column: 2;
+  }
+
+  .lp-feature.left .lp-card::before {
+    right: auto;
+    left: -2px;
+  }
+
+  .lp-card {
+    padding: 22px 18px 18px;
+  }
+
+  .lp-feature.left:not(.loaded) .lp-card {
+    transform: translateX(32px);
+  }
+
+  .lp-feature.right:not(.loaded) .lp-card {
+    transform: translateX(32px);
+  }
+}
+
+/* ---------- mock screens ---------- */
+
+.m-screen {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.m-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.m-head span {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.m-stepper {
+  display: grid;
+  grid-template-columns: 52px 1fr 52px;
+  align-items: center;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.m-stepper button {
+  height: 52px;
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  border-radius: 12px;
+}
+
+.m-stepper button:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.m-stepper output {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-stepper small {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.m-log {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 50px;
+  margin-top: 4px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.m-log:active {
+  transform: scale(0.98);
+}
+
+.m-log svg,
+.m-set svg {
+  width: 17px;
+  height: 17px;
+}
+
+.m-sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 28px;
+  margin-top: 12px;
+}
+
+.m-set {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-table th {
+  padding-bottom: 6px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.m-table td {
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.m-table tr.warm td {
+  color: var(--text-faint);
+}
+
+.m-table td:last-child,
+.m-table th:last-child {
+  width: 26px;
+}
+
+.m-box {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border-strong);
+  border-radius: 7px;
+}
+
+.m-rest {
+  text-align: center;
+}
+
+/* Figtree, not the display face: Big Shoulders has no tabular figures, so a ticking clock in it
+   would shuffle sideways every second. */
+.m-clock {
+  font-size: 3.6rem;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-clock.go {
+  color: var(--success);
+}
+
+.m-track {
+  height: 6px;
+  margin: 14px 0;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--surface-3);
+}
+
+.m-track div {
+  height: 100%;
+  border-radius: 6px;
+  background: var(--accent);
+}
+
+.m-rest-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.m-rest-actions button {
+  height: 44px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-rest-actions button:hover {
+  background: var(--surface-3);
+}
+
+.m-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 84px;
+  padding-bottom: 1px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.m-bars span {
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  background: var(--series-1);
+}
+
+/* One square under each bar: the same days, as trained or not. */
+.m-cal {
+  display: flex;
+  gap: 3px;
+  margin-top: 8px;
+}
+
+.m-cal span {
+  flex: 1;
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: var(--surface-3);
+}
+
+.m-cal span.on {
+  background: var(--heat-4);
+}
+
+.m-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 2px;
+}
+
+.m-row + .m-row {
+  border-top: 1px solid var(--border);
+}
+
+.m-row .chip svg {
+  width: 12px;
+  height: 12px;
+}
+
+.m-best {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-code {
+  padding: 16px 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-2);
+  text-align: center;
+  font-family: var(--mono);
+  /* Shrinks rather than wraps, so the code never leaves one group of digits on a line of its own. */
+  font-size: clamp(0.8rem, 3.6vw, 1.05rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

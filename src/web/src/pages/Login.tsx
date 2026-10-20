@@ -2,22 +2,37 @@ import { useRef, useState } from 'react'
 import { useLogin, useRegister } from '../api/hooks'
 import { ApiError } from '../api/client'
 import { CODE_LENGTH, digitsOnly, formatCode, isWellFormed } from '../lib/loginCode'
-import { AlertIcon, CheckIcon, CopyIcon } from '../components/Icons'
+import { AlertIcon, BackIcon, CheckIcon, CopyIcon } from '../components/Icons'
 import { copyText } from '../lib/clipboard'
 import './login.css'
 
-type Mode = 'login' | 'register'
+export type Mode = 'login' | 'register'
 
 /**
  * `onIssued` hands the new code up to App rather than showing it here, because registering also
  * signs the user in - which unmounts this component. See the note on the gate in App.tsx.
  */
-export default function Login({ onIssued }: { onIssued: (code: string) => void }) {
-  const [mode, setMode] = useState<Mode>('login')
+export default function Login({
+  onIssued,
+  initialMode = 'login',
+  onBack,
+}: {
+  onIssued: (code: string) => void
+  initialMode?: Mode
+  onBack?: () => void
+}) {
+  const [mode, setMode] = useState<Mode>(initialMode)
 
   return (
     <div className="auth">
       <div className="auth-card">
+        {onBack ? (
+          <button className="btn ghost sm auth-back" type="button" onClick={onBack}>
+            <BackIcon className="icon-sm" />
+            About RepTracker
+          </button>
+        ) : null}
+
         <header className="auth-brand">
           <span className="mark">RT</span>
           <div>

@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { api, ApiError, utcOffsetMinutes } from './client'
 import type {
-  CalendarDay, Exercise, ExerciseListItem, ExerciseStats, Overview, Paged, RegisterResponse,
+  CalendarDay, Exercise, ExerciseListItem, ExerciseStats, ImportSummary, Overview, Paged, RegisterResponse,
   Routine, SaveRoutineExercise, Units, User, Workout, WorkoutSet, WorkoutSummary,
 } from './types'
 
@@ -194,10 +194,32 @@ export function useWorkout(id: string | undefined) {
   })
 }
 
+/** The most recent finished workouts; older ones are reached through the calendar. */
 export function useWorkoutHistory() {
   return useQuery({
     queryKey: keys.workouts,
-    queryFn: () => api<Paged<WorkoutSummary>>('/workouts?limit=50'),
+    queryFn: () => api<Paged<WorkoutSummary>>(`/workouts?limit=${RECENT_WORKOUTS}`),
+  })
+}
+
+export const RECENT_WORKOUTS = 20
+
+/**
+ * Every finished workout in one calendar month, `month` being local midnight on its first day.
+ * The previous month stays on screen while the next one loads, so paging never flashes empty.
+ */
+export function useWorkoutMonth(month: Date) {
+  const after = month.toISOString()
+  const before = new Date(month.getFullYear(), month.getMonth() + 1, 1).toISOString()
+
+  return useQuery({
+    queryKey: ['workouts', 'month', after] as const,
+    // 100 is the API's page ceiling, far above the two-a-day that would fill a month.
+    queryFn: () =>
+      api<Paged<WorkoutSummary>>(
+        `/workouts?limit=100&after=${encodeURIComponent(after)}&before=${encodeURIComponent(before)}`,
+      ),
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -347,5 +369,30 @@ export function useExerciseStats(id: string | undefined, weeks: number) {
     queryFn: () =>
       api<ExerciseStats>(`/stats/exercises/${id}?weeks=${weeks}&offsetMinutes=${utcOffsetMinutes()}`),
     enabled: Boolean(id),
+  })
+}
+
+// ---- import ----
+
+/**
+ * Sends a CSV of sets. `commit: false` only reports what would be imported; `commit: true` writes
+ * it, all or nothing. Dates without a zone are read in the browser's named time zone.
+ */
+export function useImportWorkouts() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ csv, commit }: { csv: string; commit: boolean }) => {
+      const zone = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone ?? '')
+      return api<ImportSummary>(
+        `/import/workouts?commit=${commit}&timeZone=${zone}&offsetMinutes=${utcOffsetMinutes()}`,
+        { method: 'POST', raw: { content: csv, type: 'text/csv' } },
+      )
+    },
+    onSuccess: (summary) => {
+      if (!summary.committed) return
+      invalidateTraining(qc)
+      // New custom exercises appear in the picker.
+      void qc.invalidateQueries({ queryKey: keys.exercises })
+    },
   })
 }

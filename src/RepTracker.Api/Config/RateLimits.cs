@@ -13,6 +13,7 @@ public static class RateLimits
 {
     public const string Login = "login";
     public const string Register = "register";
+    public const string Import = "import";
 
     public static IServiceCollection AddAppRateLimiting(this IServiceCollection services) =>
         services.AddRateLimiter(o =>
@@ -50,6 +51,10 @@ public static class RateLimits
 
             // Every registration is a permanent row on disk that nobody asked for.
             o.AddPolicy(Register, ctx => Window($"reg:{ClientKey(ctx)}", permit: 3, seconds: 3600));
+
+            // An import reads up to 2 MB and can write thousands of rows. A preview and a commit per
+            // try leaves room for fixing a file a dozen times in ten minutes.
+            o.AddPolicy(Import, ctx => Window($"import:{ClientKey(ctx)}", permit: 24, seconds: 600));
         });
 
     private static RateLimitPartition<string> Window(string key, int permit, int seconds) =>

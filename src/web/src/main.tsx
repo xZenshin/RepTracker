@@ -5,6 +5,9 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { ApiError } from './api/client'
 import { signOut } from './api/hooks'
+// Self-hosted rather than fetched from Google, so the app still makes no third-party requests.
+import '@fontsource-variable/big-shoulders'
+import '@fontsource-variable/figtree'
 import './styles/theme.css'
 
 /**

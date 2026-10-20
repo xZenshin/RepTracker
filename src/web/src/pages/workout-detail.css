@@ -16,9 +16,13 @@
   text-align: center;
 }
 
+/* A finished workout's totals never change on screen, so they take the display face, like the
+   stats tiles. */
 .detail-totals b {
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-family: var(--display);
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.05;
 }
 
 .note-card p {
@@ -39,10 +43,8 @@
 .detail-sets th {
   text-align: left;
   padding-bottom: 6px;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 0.78rem;
+  font-weight: 600;
   color: var(--text-faint);
 }
 

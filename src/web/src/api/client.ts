@@ -17,6 +17,8 @@ export class ApiError extends Error {
 interface RequestOptions {
   method?: string
   body?: unknown
+  /** Sent as-is instead of as JSON - a CSV file, say. */
+  raw?: { content: string; type: string }
   signal?: AbortSignal
 }
 
@@ -27,8 +29,10 @@ interface RequestOptions {
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const response = await fetch(`/api${path}`, {
     method: options.method ?? 'GET',
-    headers: options.body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    headers: options.raw
+      ? { 'Content-Type': options.raw.type }
+      : options.body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: options.raw ? options.raw.content : options.body === undefined ? undefined : JSON.stringify(options.body),
     credentials: 'same-origin',
     signal: options.signal,
   })

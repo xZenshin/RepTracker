@@ -3,7 +3,8 @@
 
   These are not picked by eye. The two-slot categorical pair and the four-step sequential ramp were
   run through the palette validator against this app's own light and dark surfaces, and clear the
-  lightness band, chroma floor, colour-vision separation and contrast checks in both modes.
+  lightness band, chroma floor, colour-vision separation and contrast checks in both modes. Last
+  validated against the card surfaces #222529 (dark) and #fbfbfa (light).
 
   Charts are written against these roles, never raw hex, so a theme switch happens in one place.
   Dark is the base here because the app is dark by default; light follows under the media query,
@@ -14,14 +15,16 @@
   --series-1: #d95926; /* the metric in focus */
   --series-2: #3987e5; /* its comparison, e.g. a rolling average */
 
-  --heat-1: #184f95;
-  --heat-2: #256abf;
+  /* Re-stepped at the dark end when the surface lightened to #222529: the old #184f95 fell to
+     1.9:1 against it, under the 2:1 floor. */
+  --heat-1: #1e5bab;
+  --heat-2: #2a70c8;
   --heat-3: #3987e5;
   --heat-4: #86b6ef;
   --heat-0: var(--surface-3);
 
-  --grid: #2c2c2a;
-  --axis: #383835;
+  --grid: #363a40;
+  --axis: #484c53;
   --ink-muted: #898781;
 }
 
@@ -247,10 +250,8 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.74rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--text-faint);
   margin-bottom: 7px;
 }
@@ -260,11 +261,13 @@
   height: 14px;
 }
 
+/* A period summary only changes when the period does, so it can take the display face. */
 .tile .value {
-  font-size: 1.6rem;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  font-family: var(--display);
+  font-size: 2.3rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.005em;
 }
 
 .tile .foot {

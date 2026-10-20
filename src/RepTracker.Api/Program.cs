@@ -121,8 +121,12 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.UseRouting();
-app.UseRateLimiter();
+
+// Authentication before rate limiting, or the limiter never sees who is signed in and every request
+// lands in the anonymous per-address bucket rather than its account's. The cost is one indexed
+// session lookup for a request that is then refused; a request with no cookie costs nothing.
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
@@ -132,6 +136,7 @@ app.MapExercises();
 app.MapRoutines();
 app.MapWorkouts();
 app.MapStats();
+app.MapImport();
 
 // Anything that is not an API route is the single-page app, so deep links such as
 // /stats/<id> are served the shell and routed in the browser.

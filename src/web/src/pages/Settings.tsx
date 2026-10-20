@@ -5,6 +5,7 @@ import type { Units } from '../api/types'
 import { defaultWeightStep, toDisplay, toKg, weightStep } from '../lib/units'
 import { formatDateFull } from '../lib/time'
 import { AlertIcon } from '../components/Icons'
+import ImportWorkouts from '../components/ImportWorkouts'
 
 export default function Settings() {
   const navigate = useNavigate()
@@ -121,6 +122,8 @@ export default function Settings() {
           </p>
         </label>
       </section>
+
+      <ImportWorkouts units={units} />
 
       <section className="card">
         <div className="card-title"><h2>Your access code</h2></div>

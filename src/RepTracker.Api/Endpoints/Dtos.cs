@@ -75,3 +75,22 @@ public record UpdateSetRequest(
     decimal? Rpe, bool? IsWarmup, bool? IsCompleted);
 
 public record PagedResult<T>(List<T> Items, string? NextCursor);
+
+// ---- import ----
+
+/// <summary>
+/// What an import did, or would do. <see cref="Workouts"/> and <see cref="Sets"/> count only what is
+/// new; workouts already in the account are counted in <see cref="Duplicates"/> and skipped. Line 0
+/// in an error means the file as a whole rather than one row of it.
+/// </summary>
+public record ImportSummaryDto(
+    bool Committed, int Rows, int Workouts, int Sets, DateOnly? From, DateOnly? To, int Duplicates,
+    int MatchedExercises, List<ImportNewExerciseDto> NewExercises, List<ImportRenamedDto> Renamed,
+    List<ImportErrorDto> Errors, int ErrorCount);
+
+public record ImportNewExerciseDto(string Name, string MuscleGroup, Modality Modality);
+
+/// <summary>A name in the file that was matched to an exercise spelled differently, like "Squat" to "Back Squat".</summary>
+public record ImportRenamedDto(string From, string To);
+
+public record ImportErrorDto(int Line, string Message);

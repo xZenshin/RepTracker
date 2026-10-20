@@ -119,7 +119,7 @@ export default function RoutineEditor() {
             className="textarea"
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
-            placeholder="Anything you want to remember about this day"
+            placeholder="Anything you want to remember"
             maxLength={500}
           />
         </label>

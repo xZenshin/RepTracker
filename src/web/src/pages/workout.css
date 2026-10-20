@@ -60,19 +60,15 @@
 }
 
 .focus-eyebrow {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  font-size: 0.82rem;
+  font-weight: 650;
   color: var(--accent);
 }
 
 .focus-title {
-  margin: 4px 0 4px;
-  font-size: clamp(1.65rem, 7.4vw, 2.2rem);
-  font-weight: 750;
-  line-height: 1.12;
-  letter-spacing: -0.025em;
+  margin: 4px 0 6px;
+  font-size: clamp(2.2rem, 10vw, 3rem);
+  line-height: 0.92;
 }
 
 /* ---------- log card ---------- */
@@ -227,10 +223,8 @@
 
 .set-head {
   padding: 0 4px;
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.78rem;
+  font-weight: 600;
   color: var(--text-faint);
 }
 
@@ -400,10 +394,8 @@
 
 .dock-clock span {
   margin-top: 3px;
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.74rem;
+  font-weight: 600;
   color: var(--text-faint);
 }
 
@@ -428,10 +420,8 @@
 }
 
 .dock-side-text small {
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.74rem;
+  font-weight: 600;
   color: var(--text-faint);
 }
 

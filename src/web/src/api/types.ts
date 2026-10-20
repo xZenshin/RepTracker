@@ -271,3 +271,32 @@ export interface ExerciseStats {
   records: ExerciseRecords
   trend: Trend
 }
+
+export interface ImportNewExercise {
+  name: string
+  muscleGroup: string
+  modality: Modality
+}
+
+export interface ImportError {
+  /** 0 means the file as a whole rather than one row. */
+  line: number
+  message: string
+}
+
+/** What an import did, or - before `committed` - would do. Counts cover new workouts only. */
+export interface ImportSummary {
+  committed: boolean
+  rows: number
+  workouts: number
+  sets: number
+  from?: string | null
+  to?: string | null
+  duplicates: number
+  matchedExercises: number
+  newExercises: ImportNewExercise[]
+  /** Names in the file matched to an exercise spelled differently. */
+  renamed: { from: string; to: string }[]
+  errors: ImportError[]
+  errorCount: number
+}

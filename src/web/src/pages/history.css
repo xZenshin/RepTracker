@@ -9,9 +9,8 @@
   margin: 0 -16px 8px;
   padding: 6px 16px;
   background: var(--bg);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  font-size: 0.68rem;
+  font-size: 1.15rem;
+  color: var(--text-dim);
 }
 
 .history-row {
@@ -37,10 +36,13 @@
   line-height: 1.15;
 }
 
+/* A date that never changes on screen, so it can take the display face despite its proportional
+   figures. */
 .history-row .when b {
-  font-size: 1.15rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  font-family: var(--display);
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .history-row .what {
@@ -72,5 +74,257 @@
     margin-right: -32px;
     padding-left: 32px;
     padding-right: 32px;
+  }
+}
+
+/* ---------- recent list heading ---------- */
+
+.history-recent {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 26px 0 10px;
+}
+
+/* ---------- month calendar ---------- */
+
+.cal {
+  padding-bottom: 14px;
+}
+
+.cal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.cal-head h2 {
+  font-size: 1.5rem;
+}
+
+.cal-head p {
+  margin-top: 4px;
+}
+
+.cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cal-step {
+  width: 40px;
+  padding: 0;
+}
+
+.cal-step svg {
+  width: 18px;
+  height: 18px;
+}
+
+.cal-step .flip {
+  rotate: 180deg;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  transition: opacity 0.15s ease;
+}
+
+/* The previous month stays up while the next loads; dimmed, so it is not mistaken for the new one. */
+.cal-grid.loading {
+  opacity: 0.55;
+}
+
+.cal-weekday {
+  padding: 0 6px 4px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.cal-day {
+  position: relative;
+  min-height: 58px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.cal-day.pad {
+  background: none;
+}
+
+.cal-num {
+  display: block;
+  padding: 5px 7px 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-day.today {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.cal-day.trained {
+  background: var(--accent-soft);
+}
+
+.cal-day.trained .cal-num {
+  color: var(--accent);
+}
+
+.cal-hit {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  min-height: 58px;
+  border-radius: inherit;
+  text-align: left;
+}
+
+.cal-hit:hover {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.cal-day.picked .cal-hit {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.cal-name {
+  padding: 2px 7px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.76rem;
+  font-weight: 650;
+  color: var(--text);
+}
+
+/* Beside the day number rather than under the name, so a busy day is no taller than the rest. */
+.cal-more {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* ---------- the quick look ---------- */
+
+.cal-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  width: max-content;
+  max-width: 240px;
+  translate: -50% 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+/* Edge columns anchor the tip to their own side, so it never runs off the card. */
+.cal-tip.start {
+  left: 0;
+  translate: none;
+}
+
+.cal-tip.end {
+  left: auto;
+  right: 0;
+  translate: none;
+}
+
+.cal-tip-date {
+  margin-bottom: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.cal-tip-workout {
+  display: flex;
+  flex-direction: column;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-tip-workout + .cal-tip-workout {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.cal-tip-workout b {
+  color: var(--text);
+}
+
+/* Hover where there is a pointer to hover with; keyboard focus everywhere. A tap on a phone goes
+   straight to the workout, so the tip never flashes up on its way out. */
+@media (hover: hover) {
+  .cal-day:hover .cal-tip {
+    visibility: visible;
+    opacity: 1;
+  }
+}
+
+.cal-day:has(.cal-hit:focus-visible) .cal-tip {
+  visibility: visible;
+  opacity: 1;
+}
+
+.cal-picked {
+  margin-top: 12px;
+}
+
+@media (max-width: 560px) {
+  .cal-grid {
+    gap: 3px;
+  }
+
+  .cal-day,
+  .cal-hit {
+    min-height: 50px;
+  }
+
+  .cal-weekday {
+    padding: 0 0 4px;
+    text-align: center;
+  }
+
+  .cal-num {
+    padding: 4px 0 0;
+    text-align: center;
+  }
+
+  .cal-name {
+    padding: 1px 3px 0;
+    text-align: center;
+    font-size: 0.66rem;
+  }
+
+  .cal-more {
+    top: 3px;
+    right: 4px;
+    font-size: 0.64rem;
   }
 }

@@ -93,6 +93,12 @@ middleware and runs before the handler, so a server-side rejection has already c
 The identical check in `web/src/lib/loginCode.ts` is what stops typos from spending the login
 budget; the server copy only saves a database lookup.
 
+**Rate limiting runs after `UseAuthentication`, not before.** The global limiter partitions
+signed-in traffic per account (240 a minute) and anonymous traffic per address (60), and it can only
+tell the two apart once the session has been read. Until 2026-10-20 it ran first, so every signed-in
+user was silently held to the anonymous budget. The price of the order is one indexed session lookup
+for a request that is then refused; a request with no cookie costs nothing.
+
 **Static files are served before `UseAuthentication`.** Otherwise every stylesheet and script
 request runs the session handler and hits the database. Moving `UseStaticFiles` back below auth in
 `Program.cs` silently reintroduces that. The ordering is load-bearing.
@@ -141,6 +147,40 @@ or revoked session drops to the login screen the same way an explicit sign-out d
 **Personal records are reconstructed by replaying history**, not stored in a records table. Editing
 or deleting a set therefore corrects the New PR badges instead of leaving a phantom behind.
 `StatsService.BuildRecordHistory`.
+
+**Signed-out visitors land on a landing page** (`pages/Landing.tsx`, owner decision 2026-10-20). Its
+buttons open the existing sign-in card in either mode, with a way back. It is lazy-loaded, so
+signed-in users never download it.
+
+**The whole app shares the landing page's look** (2026-10-20): its charcoal/chalk palette in
+`theme.css`, Big Shoulders for headings and Figtree for everything else. Both fonts are bundled from
+`@fontsource-variable` packages (imported in `main.tsx`) rather than fetched from Google, so the app
+still makes no third-party requests. **Big Shoulders has no tabular figures** - a 1 is half the
+width of a 0 - so it is only for headings and for numbers that never change on screen (stats tiles,
+history dates, a finished workout's totals). Clocks, timers and steppers stay in Figtree with
+`tabular-nums`, or they shuffle sideways as they tick. Small labels are sentence case, not tracked
+capitals. When the surfaces changed, the chart colours were re-run through the validator: the dark
+ramp's darkest step was re-stepped (it fell under 2:1 on the lighter card), everything else passed.
+`--text-faint` now clears 4.5:1 on cards in both themes. Its features hang off a barbell, loaded in competition plate colours with the
+heaviest first, so the order of the cards is the order of importance. The set-logging and
+rest-timer cards are working demos with their own state. They must never reuse `useRestTimer`,
+which would write into the real timer's `sessionStorage` slot.
+
+**Workouts import from a CSV, one row per set** (Settings, `POST /api/import/workouts`, 2026-10-20).
+The file goes up as the raw `text/csv` body, so that endpoint alone can raise the 64 KB body cap to
+2 MB, per request. Without `?commit=true` it only previews; with it, it writes everything in one
+`SaveChanges` - and nothing at all if any row has an error. Parsing is pure and separate from the
+endpoint (`Import/Csv.cs`, `Import/WorkoutCsv.cs`), which makes it the easiest thing in the app to
+put tests around. Things that will look odd:
+- *Separator and decimals are sniffed.* A European Excel writes `;` and `102,5`. The template starts
+  with `sep=,`, Excel's own hint, so it opens in columns there too; the importer skips that line.
+- *Dates convert in the browser's named zone* (`timeZone=Europe/Copenhagen`), not its current offset,
+  so a summer workout imported in winter keeps its hour and its day. Untimed workouts start at noon.
+- *Exercise names match loosely* - case, spaces, hyphens and a plural s are ignored, and a short list
+  of unambiguous shorthands (`squat`, `ohp`, `rdl`) maps to catalogue lifts. Every such match is
+  listed in the preview. Anything unmatched becomes a custom exercise.
+- *Re-importing is harmless*: a workout with the same start time and name is skipped as a duplicate.
+- The per-account caps (workouts, exercises per workout, sets per exercise, custom exercises) apply.
 
 **Stats has two tabs: Overview (`/stats`) and Exercises (`/stats/exercises`).** Exercises lists every
 exercise with a completed working set in the last three years. Each row opens the per-exercise page
@@ -270,12 +310,16 @@ Ordered by what to fix first.
    hand themselves a fresh rate-limit budget.
 5. **Static files are outside the rate limiter** (it returns `NoLimiter` for non-`/api` paths).
    Cheap and cacheable, so this leans on the platform's own limits.
-6. **No pagination UI.** The API returns a keyset cursor and the history page requests 50, but only
-   uses the cursor to caption the list "(most recent)" — there is no way to load the next page.
+6. **The history list stops at 20, on purpose** (owner decision, 2026-10-20). Older workouts are
+   reached through the month calendar above it, which asks `GET /api/workouts` for one month with
+   `after` and `before` (local midnights) and `limit=100`. The month lives in the URL
+   (`?month=2026-08`), so Back from a workout returns to it. Hover or keyboard focus on a day shows
+   a quick look; touch has no hover, so a tap opens the workout, and a day with two workouts lists
+   both under the grid instead. Nothing calls the keyset cursor for a second page.
 7. **Workout exercises cannot be reordered from the UI.** `PUT .../exercises/order` exists and
    works; nothing calls it.
 8. **The catalogue is English-only and has no i18n**, as is all UI copy.
-9. **Bundle is ~105 KB gzip initial**, with Recharts (~107 KB) split into the stats routes — which
+9. **Bundle is ~109 KB gzip initial**, with Recharts (~107 KB) split into the stats routes — which
    phones never load, since stats are desktop-only.
 
 ---
@@ -305,8 +349,9 @@ cd src/web && npm run dev                       # Vite on :5173, proxies /api
 
 `dotnet run -- seed-demo` mints an account with ~20 weeks of training and prints its login code —
 the fastest way to get a populated dashboard. It refuses to run outside Development because it
-backdates rows, which nothing reachable over HTTP can do. It also plants one deliberately stalled
-lift (Overhead Press) so the stalling detector has something to find.
+mints a whole account with backdated history. (The CSV import also backdates workouts, but only into
+the signed-in user's own account, which is their history to write.) It also plants one deliberately
+stalled lift (Overhead Press) so the stalling detector has something to find.
 
 Before committing:
 

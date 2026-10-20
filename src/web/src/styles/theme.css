@@ -3,21 +3,27 @@
 
   Dark is the default rather than the alternative: this is used in a gym, often at night, held in
   one hand, and a bright screen between sets is unpleasant. The light palette follows for desktop.
+
+  The palette is the landing page's: rubber-floor charcoal in the dark, a chalked platform in the
+  light. Headings are set in Big Shoulders, a condensed face drawn from Chicago's signage; the rest
+  is Figtree. Big Shoulders has no tabular figures, so anything that ticks or is edited in place - a
+  clock, a timer, a stepper - stays in Figtree, where `tabular-nums` keeps its digits still.
 */
 
 :root {
   color-scheme: dark;
 
-  --bg: #0d0f12;
-  --surface: #16191e;
-  --surface-2: #1e2229;
-  --surface-3: #272c35;
-  --border: #2c323c;
-  --border-strong: #3d4553;
+  --bg: #1b1d20;
+  --surface: #222529;
+  --surface-2: #2a2d32;
+  --surface-3: #33373d;
+  --border: #30343b;
+  --border-strong: #444a53;
 
-  --text: #f2f4f7;
-  --text-dim: #98a1b0;
-  --text-faint: #6a7381;
+  --text: #f3f4f6;
+  --text-dim: #a6aebb;
+  /* 4.7:1 on a card: the faintest text is still small text, so it clears 4.5:1 where it sits. */
+  --text-faint: #868e9c;
 
   --accent: #ff8a3d;
   --accent-soft: #3a2415;
@@ -40,7 +46,8 @@
   /* Nothing interactive is smaller than this: it is being tapped by a tired thumb. */
   --touch: 44px;
 
-  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font: 'Figtree Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --display: 'Big Shoulders Variable', 'Arial Narrow', var(--font);
   --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
 
   --nav-height: 62px;
@@ -51,16 +58,16 @@
   :root:not([data-theme='dark']) {
     color-scheme: light;
 
-    --bg: #f4f5f7;
-    --surface: #ffffff;
-    --surface-2: #f0f2f5;
-    --surface-3: #e4e8ed;
-    --border: #dde1e7;
-    --border-strong: #c2c9d3;
+    --bg: #e9eae6;
+    --surface: #fbfbfa;
+    --surface-2: #f1f2ee;
+    --surface-3: #e3e5e0;
+    --border: #d9dbd6;
+    --border-strong: #bfc3bc;
 
-    --text: #131720;
-    --text-dim: #5a6472;
-    --text-faint: #8b95a3;
+    --text: #15181d;
+    --text-dim: #565e6a;
+    --text-faint: #6a727d;
 
     --accent: #e2661a;
     --accent-soft: #fdeee2;
@@ -103,11 +110,21 @@ body {
 h1, h2, h3, h4 {
   margin: 0;
   font-weight: 650;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
 }
 
-h1 { font-size: 1.55rem; }
-h2 { font-size: 1.15rem; }
+/* Page and section headings are signage; smaller headings stay in the text face. */
+h1,
+h2 {
+  font-family: var(--display);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+}
+
+h1 { font-size: 2.15rem; }
+h2 { font-size: 1.35rem; }
 h3 { font-size: 0.98rem; }
 
 p { margin: 0; }
@@ -171,8 +188,8 @@ textarea {
 
 .page-header .subtitle {
   color: var(--text-dim);
-  font-size: 0.85rem;
-  margin-top: 2px;
+  font-size: 0.88rem;
+  margin-top: 6px;
 }
 
 /* ---------- navigation ---------- */
@@ -290,9 +307,10 @@ textarea {
     align-items: center;
     gap: 10px;
     padding: 0 14px 22px;
-    font-size: 1.05rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-family: var(--display);
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
   }
 
   .brand .mark {
@@ -303,6 +321,7 @@ textarea {
     color: var(--accent-ink);
     display: grid;
     place-items: center;
+    font-family: var(--font);
     font-size: 0.85rem;
     font-weight: 800;
   }
@@ -339,8 +358,7 @@ textarea {
 }
 
 .card-title h2 {
-  font-size: 0.95rem;
-  letter-spacing: 0.01em;
+  font-size: 1.25rem;
 }
 
 .card-title .hint {
@@ -555,6 +573,16 @@ textarea {
 .faint { color: var(--text-faint); }
 .small { font-size: 0.82rem; }
 .tabular { font-variant-numeric: tabular-nums; }
+
+/* Read aloud, never shown: the words a symbol stands for. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .mono { font-family: var(--mono); }
 
 .empty {

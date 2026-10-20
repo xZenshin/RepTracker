@@ -1,0 +1,128 @@
+.import-actions {
+  margin-top: 14px;
+}
+
+/* The real file input is hidden inside its label, which is styled as the button. */
+.import-pick {
+  position: relative;
+  cursor: pointer;
+}
+
+.import-pick input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.import-pick:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.import-columns {
+  margin-top: 14px;
+  font-size: 0.86rem;
+}
+
+.import-columns summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.import-columns table {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+}
+
+.import-columns th,
+.import-columns td {
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.import-columns th {
+  width: 9.5rem;
+  padding-right: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.import-columns td {
+  color: var(--text-dim);
+}
+
+.import-panel {
+  margin-top: 16px;
+}
+
+.import-preview,
+.import-errors {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.import-headline {
+  font-family: var(--display);
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.import-facts {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+}
+
+.import-facts li + li {
+  margin-top: 4px;
+}
+
+.import-facts b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.import-errors {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.import-errors > p:first-child {
+  font-size: 0.9rem;
+}
+
+.import-errors ul {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.86rem;
+}
+
+.import-errors li {
+  display: flex;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.import-line {
+  flex: 0 0 4.2rem;
+  font-weight: 600;
+  color: var(--danger);
+  font-variant-numeric: tabular-nums;
+}
+
+.import-done a {
+  font-weight: 700;
+  text-decoration: underline;
+}

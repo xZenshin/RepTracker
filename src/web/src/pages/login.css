@@ -15,6 +15,11 @@
   box-shadow: var(--shadow);
 }
 
+.auth-back {
+  margin: -10px 0 14px -10px;
+  color: var(--text-dim);
+}
+
 .auth-brand {
   display: flex;
   align-items: center;
@@ -35,8 +40,10 @@
   letter-spacing: -0.02em;
 }
 
+/* The wordmark, set like the landing page's, rather than as a shouted page title. */
 .auth-brand h1 {
-  font-size: 1.3rem;
+  font-size: 1.9rem;
+  text-transform: none;
 }
 
 /* Wide tracking makes a twenty-digit string possible to read back off the screen. */

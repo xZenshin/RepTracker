@@ -59,9 +59,11 @@
   margin: 0 -14px 6px;
   padding: 6px 14px;
   background: var(--surface);
+  font-family: var(--display);
+  font-size: 1.1rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  font-size: 0.68rem;
+  color: var(--text-dim);
 }
 
 .picker-item {

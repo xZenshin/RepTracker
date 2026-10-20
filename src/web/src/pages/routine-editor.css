@@ -59,11 +59,9 @@
 }
 
 .routine-row .targets .label {
-  font-size: 0.7rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .routine-row .targets .input,
