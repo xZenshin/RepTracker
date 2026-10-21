@@ -7,7 +7,11 @@ import {
   MAX_SETS, addExercise, addSet, clearLiveWorkout, editLiveWorkout, newId, removeExercise, removeSet,
   setRest, swapExercise, toSaveRequest, updateSet, useLiveWorkout, type LiveWorkout,
 } from '../lib/liveWorkout'
-import { formatVolume, formatWeight, toDisplay, toKg, weightStep } from '../lib/units'
+import {
+  fieldsFor, hasValues, parseInputs, primaryValue, secondaryValue, stepValue,
+  type FieldKey, type FieldSpec, type ParsedValues,
+} from '../lib/setFields'
+import { formatVolume, formatWeight, weightStep } from '../lib/units'
 import { formatDuration, formatRelative } from '../lib/time'
 import { useElapsed } from '../lib/useElapsed'
 import { computeTotals } from '../lib/totals'
@@ -228,7 +232,7 @@ function ExerciseFocus({
   // empty. Once a set is logged, copy it into the empty rows after it: the next set is usually the
   // same, and ticking a blank row would otherwise log nothing. Rows that already hold numbers -
   // typed in, or carried over from last time - are never touched.
-  function logged(index: number, values: SetValues) {
+  function logged(index: number, values: ParsedValues) {
     onLogged()
     if (previous || !hasValues(values)) return
 
@@ -301,7 +305,7 @@ function LogSetCard({
   units: Units
   fields: FieldSpec[]
   /** With the set's position and the values it was logged with. */
-  onLogged: (index: number, values: SetValues) => void
+  onLogged: (index: number, values: ParsedValues) => void
 }) {
   const target = exercise.sets.find((s) => !s.isCompleted)
   const seedKey = `${target?.id ?? 'new'}:${exercise.sets.length}`
@@ -387,7 +391,7 @@ function SetRow({
   modality: Modality
   units: Units
   fields: FieldSpec[]
-  onCompleted: (values: SetValues) => void
+  onCompleted: (values: ParsedValues) => void
 }) {
   // Held locally while typing so the field never fights the workout mid-keystroke; committed on blur.
   const [primary, setPrimary] = useState(() => primaryValue(set, modality, units))
@@ -806,73 +810,13 @@ function writeCurrent(id: string) {
   }
 }
 
-// ---- modality-aware field plumbing ----
-// Each exercise type puts different things in the two values, so labels, stepping, parsing and
-// formatting all key off the modality rather than being hard-coded to weight and reps.
-
-type FieldKey = 'primary' | 'secondary'
-
-interface FieldSpec {
-  key: FieldKey
-  label: string
-  /** Column heading in the set list, where space is tight. */
-  short: string
-  /** Entered as m:ss rather than a plain number. */
-  clock: boolean
-  step: number
-  min: number | null
-  inputMode: 'text' | 'numeric' | 'decimal'
-}
+// ---- modality-aware fields: see lib/setFields ----
 
 /**
- * The two values for a modality, in display order: reps above weight, as on a gym machine log.
- * `weightStep` is in display units - the user's own setting, from weightStep() in lib/units.
- */
-function fieldsFor(modality: Modality, units: Units, weightStep: number): FieldSpec[] {
-  const reps: FieldSpec = { key: 'secondary', label: 'Reps', short: 'Reps', clock: false, step: 1, min: 0, inputMode: 'numeric' }
-
-  if (modality === 'Duration') {
-    return [
-      { key: 'primary', label: 'Time', short: 'Time', clock: true, step: 15, min: 0, inputMode: 'text' },
-      reps,
-    ]
-  }
-
-  if (modality === 'DistanceDuration') {
-    return [
-      { key: 'primary', label: 'Distance (m)', short: 'Meters', clock: false, step: 100, min: 0, inputMode: 'decimal' },
-      { key: 'secondary', label: 'Time', short: 'Time', clock: true, step: 15, min: 0, inputMode: 'text' },
-    ]
-  }
-
-  const bodyweight = modality === 'BodyweightReps'
-  return [
-    reps,
-    {
-      key: 'primary',
-      label: bodyweight ? `Added weight (${units})` : `Weight (${units})`,
-      short: bodyweight ? `+${units}` : units,
-      clock: false,
-      step: weightStep,
-      // Negative added load is how an assisted pull-up is logged.
-      min: bodyweight ? null : 0,
-      inputMode: 'decimal',
-    },
-  ]
-}
-
-function stepValue(text: string, field: FieldSpec, direction: 1 | -1): string {
-  const current = (field.clock ? parseClock(text) : parseNumber(text)) ?? 0
-  let next = current + direction * field.step
-  if (field.min !== null) next = Math.max(field.min, next)
-  next = Math.round(next * 100) / 100
-  return field.clock ? formatDuration(next) : String(next)
-}
-
-/**
- * Where the steppers start: the set being logged, which opened on last time's numbers; else, past the end of last time or on a first attempt, the last set done this session
- * (the common "same again" case); else the matching set from last time. A first attempt with
- * nothing logged yet starts empty.
+ * Where the steppers start: the set being logged, which opened on last time's numbers; else, past
+ * the end of last time or on a first attempt, the last set done this session (the common "same
+ * again" case); else the matching set from last time. A first attempt with nothing logged yet
+ * starts empty.
  */
 function seedValues(
   exercise: WorkoutExercise, target: WorkoutSet | undefined, units: Units,
@@ -890,62 +834,9 @@ function seedValues(
   }
 }
 
-function hasValues(set: Partial<WorkoutSet>): boolean {
-  return set.weightKg != null || set.reps != null || set.durationSeconds != null || set.distanceM != null
-}
-
-function primaryValue(set: Partial<WorkoutSet>, modality: Modality, units: Units): string {
-  if (modality === 'Duration') return set.durationSeconds ? formatDuration(set.durationSeconds) : ''
-  if (modality === 'DistanceDuration') return set.distanceM != null ? String(set.distanceM) : ''
-  const display = toDisplay(set.weightKg, units)
-  return display === null ? '' : String(Math.round(display * 100) / 100)
-}
-
-function secondaryValue(set: Partial<WorkoutSet>, modality: Modality): string {
-  if (modality === 'Duration') return set.reps != null ? String(set.reps) : ''
-  if (modality === 'DistanceDuration') return set.durationSeconds ? formatDuration(set.durationSeconds) : ''
-  return set.reps != null ? String(set.reps) : ''
-}
-
-/** A set's values as entered, parsed into what the API stores. */
-type SetValues = ReturnType<typeof parseInputs>
-
-function parseInputs(primary: string, secondary: string, modality: Modality, units: Units) {
-  if (modality === 'Duration') {
-    return { durationSeconds: parseClock(primary), reps: parseInt10(secondary) }
-  }
-  if (modality === 'DistanceDuration') {
-    return { distanceM: parseNumber(primary), durationSeconds: parseClock(secondary) }
-  }
-  return { weightKg: toKg(parseNumber(primary), units), reps: parseInt10(secondary) }
-}
-
 function summarisePrevious(sets: PreviousSet[], units: Units): string {
   if (sets.length === 0) return 'no sets'
 
   const top = sets.reduce((best, s) => ((s.weightKg ?? 0) > (best.weightKg ?? 0) ? s : best))
   return `${sets.length} sets, top ${formatWeight(top.weightKg, units, false)} x ${top.reps ?? 0}`
-}
-
-/** Accepts either "90" or "1:30" so a plank and a 20-minute row are both natural to enter. */
-function parseClock(text: string): number | null {
-  const trimmed = text.trim()
-  if (!trimmed) return null
-
-  if (trimmed.includes(':')) {
-    const parts = trimmed.split(':').map((p) => Number(p.trim()) || 0)
-    return parts.reduce((total, part) => total * 60 + part, 0)
-  }
-
-  return parseInt10(trimmed)
-}
-
-function parseNumber(text: string): number | null {
-  const value = Number(text.trim().replace(',', '.'))
-  return text.trim() === '' || Number.isNaN(value) ? null : value
-}
-
-function parseInt10(text: string): number | null {
-  const value = parseInt(text.trim(), 10)
-  return Number.isNaN(value) ? null : value
 }

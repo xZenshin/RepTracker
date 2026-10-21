@@ -5,9 +5,11 @@ import {
 } from 'recharts'
 import { useExerciseStats, useMe, useStatExercises } from '../api/hooks'
 import type { ExerciseSessionPoint, Trend, Units } from '../api/types'
-import { formatVolume, formatWeight, toDisplay } from '../lib/units'
+import { formatVolume, formatWeight, toDisplay, weightStep } from '../lib/units'
 import { formatRelative } from '../lib/time'
 import { BackIcon, TrophyIcon } from '../components/Icons'
+import ExerciseOutliers from '../components/ExerciseOutliers'
+import SessionEditor from '../components/SessionEditor'
 import '../styles/viz.css'
 import './workout-detail.css'
 
@@ -22,6 +24,8 @@ export default function ExerciseDetail() {
   const { exerciseId } = useParams()
   const navigate = useNavigate()
   const [weeks, setWeeks] = useState(52)
+  // The session picked from a chart for correcting, by workout.
+  const [editing, setEditing] = useState<string | null>(null)
   const { data, isPending, isError } = useExerciseStats(exerciseId, weeks)
   const { data: all } = useStatExercises()
   const { data: user } = useMe()
@@ -36,7 +40,8 @@ export default function ExerciseDetail() {
             <BackIcon className="icon-sm" />
           </button>
           <div style={{ minWidth: 0 }}>
-            <h1>{data?.exerciseName ?? 'Exercise'}</h1>
+            {/* From the list too, since a period with nothing logged in it brings no name. */}
+            <h1>{data?.exerciseName ?? all?.find((item) => item.id === exerciseId)?.name ?? 'Exercise'}</h1>
             <p className="subtitle">{data ? `${data.muscleGroup} - ${data.sessions.length} sessions` : ''}</p>
           </div>
         </div>
@@ -73,6 +78,10 @@ export default function ExerciseDetail() {
           ))}
         </div>
       </div>
+
+      {/* First, because a mistake here is what makes everything below look wrong. Checked across
+          all history, so it shows whatever the period - even one with nothing in it. */}
+      {exerciseId ? <ExerciseOutliers exerciseId={exerciseId} units={units} /> : null}
 
       {isPending ? (
         <>
@@ -120,7 +129,7 @@ export default function ExerciseDetail() {
               <h2>Estimated 1RM</h2>
               <span className="hint">Best set each session</span>
             </div>
-            <OneRepMaxChart sessions={data.sessions} units={units} />
+            <OneRepMaxChart sessions={data.sessions} units={units} onPick={setEditing} />
             <p className="faint small" style={{ marginTop: 10 }}>
               Estimated with the Epley formula from your best working set, ignoring sets above 12
               reps where the estimate stops tracking real strength. Filled points are new records.
@@ -132,7 +141,7 @@ export default function ExerciseDetail() {
               <h2>Volume per session</h2>
               <span className="hint">Weight moved</span>
             </div>
-            <SessionVolumeChart sessions={data.sessions} units={units} />
+            <SessionVolumeChart sessions={data.sessions} units={units} onPick={setEditing} />
           </section>
 
           {data.records.bestRepsByWeight.length > 0 ? (
@@ -163,8 +172,32 @@ export default function ExerciseDetail() {
           ) : null}
         </>
       )}
+      {editing && exerciseId ? (
+        <SessionEditor
+          exerciseId={exerciseId}
+          workoutId={editing}
+          units={units}
+          weightStep={weightStep(units, user?.weightStepKg)}
+          onClose={() => setEditing(null)}
+        />
+      ) : null}
     </main>
   )
+}
+
+/**
+ * Charts take a click anywhere, not just on a dot: it picks the session the tooltip is showing,
+ * which is the nearest one. Most 1RM points are not drawn as dots at all.
+ */
+function pickHandler(rows: { workoutId: string }[], onPick: (workoutId: string) => void) {
+  return (state: { activeTooltipIndex?: number | string | null } | null) => {
+    // Null when the click lands before the chart has registered the pointer - and Number(null)
+    // is 0, which would open the first session rather than none.
+    const raw = state?.activeTooltipIndex
+    if (raw === null || raw === undefined || raw === '') return
+    const row = rows[Number(raw)]
+    if (row) onPick(row.workoutId)
+  }
 }
 
 function TrendValue({ trend, units }: { trend: Trend; units: Units }) {
@@ -195,10 +228,13 @@ function TrendValue({ trend, units }: { trend: Trend; units: Units }) {
   )
 }
 
-function OneRepMaxChart({ sessions, units }: { sessions: ExerciseSessionPoint[]; units: Units }) {
+function OneRepMaxChart({
+  sessions, units, onPick,
+}: { sessions: ExerciseSessionPoint[]; units: Units; onPick: (workoutId: string) => void }) {
   const rows = sessions
     .filter((session) => session.estimatedOneRepMax != null)
     .map((session) => ({
+      workoutId: session.workoutId,
       date: session.date,
       label: shortDate(session.date),
       value: round(toDisplay(session.estimatedOneRepMax, units)),
@@ -212,9 +248,9 @@ function OneRepMaxChart({ sessions, units }: { sessions: ExerciseSessionPoint[];
   }
 
   return (
-    <div className="chart-frame tall">
+    <div className="chart-frame tall pickable">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={rows} margin={{ top: 8, right: 10, bottom: 0, left: -14 }}>
+        <LineChart data={rows} margin={{ top: 8, right: 10, bottom: 0, left: -14 }} onClick={pickHandler(rows, onPick)}>
           <CartesianGrid stroke="var(--grid)" vertical={false} />
           <XAxis
             dataKey="label"
@@ -247,6 +283,7 @@ function OneRepMaxChart({ sessions, units }: { sessions: ExerciseSessionPoint[];
                     <span className="tabular">{row.top} x {row.reps}</span>
                   </div>
                   {row.isRecord ? <div className="row" style={{ color: 'var(--success)' }}>New record</div> : null}
+                  <div className="hint-row">Click to correct this session</div>
                 </div>
               )
             }}
@@ -282,8 +319,11 @@ function OneRepMaxChart({ sessions, units }: { sessions: ExerciseSessionPoint[];
   )
 }
 
-function SessionVolumeChart({ sessions, units }: { sessions: ExerciseSessionPoint[]; units: Units }) {
+function SessionVolumeChart({
+  sessions, units, onPick,
+}: { sessions: ExerciseSessionPoint[]; units: Units; onPick: (workoutId: string) => void }) {
   const rows = sessions.map((session) => ({
+    workoutId: session.workoutId,
     date: session.date,
     label: shortDate(session.date),
     value: round(toDisplay(session.volumeKg, units)),
@@ -294,10 +334,11 @@ function SessionVolumeChart({ sessions, units }: { sessions: ExerciseSessionPoin
   if (rows.length === 0) return <p className="muted small">No sessions in this period.</p>
 
   return (
-    <div className="chart-frame">
+    <div className="chart-frame pickable">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={rows}
+          onClick={pickHandler(rows, onPick)}
           margin={{ top: 4, right: 10, bottom: 0, left: -14 }}
           barCategoryGap="20%"
         >
@@ -332,12 +373,18 @@ function SessionVolumeChart({ sessions, units }: { sessions: ExerciseSessionPoin
                     <span>Work</span>
                     <span className="tabular">{row.sets} sets, {row.reps} reps</span>
                   </div>
+                  <div className="hint-row">Click to correct this session</div>
                 </div>
               )
             }}
           />
           <Bar dataKey="value" fill="var(--series-1)" radius={[4, 4, 0, 0]} maxBarSize={30}
             isAnimationActive={false}
+            // A bar hit directly is that bar's session, whether or not the chart has seen the pointer.
+            onClick={(_, index) => {
+              const row = rows[index]
+              if (row) onPick(row.workoutId)
+            }}
           />
         </BarChart>
       </ResponsiveContainer>

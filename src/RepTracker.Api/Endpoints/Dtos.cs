@@ -84,6 +84,14 @@ public record SaveWorkoutSet(
     decimal? WeightKg, int? Reps, int? DurationSeconds, decimal? DistanceM, decimal? Rpe,
     DateTimeOffset? CompletedAt);
 
+/// <summary>
+/// Corrections to one exercise's sets in a saved workout: new values for some, removal for others.
+/// Applied together, so a session is never left half fixed.
+/// </summary>
+public record CorrectSetsRequest(List<CorrectedSet>? Update, List<Guid>? Remove);
+
+public record CorrectedSet(Guid Id, decimal? WeightKg, int? Reps, int? DurationSeconds, decimal? DistanceM);
+
 public record PagedResult<T>(List<T> Items, string? NextCursor);
 
 // ---- import ----

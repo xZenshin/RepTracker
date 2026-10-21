@@ -1,7 +1,8 @@
 import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { api, ApiError, utcOffsetMinutes } from './client'
 import type {
-  CalendarDay, Exercise, ExerciseListItem, ExerciseStats, ImportSummary, MergeSummary, Overview, Paged, RegisterResponse,
+  CalendarDay, Exercise, ExerciseListItem, ExerciseStats, ImportSummary, MergeSummary, Overview, Paged,
+  RegisterResponse, SessionReview,
   Routine, SaveRoutineExercise, Units, User, Workout, WorkoutSummary,
 } from './types'
 import type { LastTime, SaveWorkoutRequest } from '../lib/liveWorkout'
@@ -319,6 +320,52 @@ export function useExerciseStats(id: string | undefined, weeks: number) {
     queryFn: () =>
       api<ExerciseStats>(`/stats/exercises/${id}?weeks=${weeks}&offsetMinutes=${utcOffsetMinutes()}`),
     enabled: Boolean(id),
+  })
+}
+
+/** Sessions of an exercise that look like logging mistakes, with a suggested fix for each set. */
+export function useOutliers(exerciseId: string | undefined) {
+  return useQuery({
+    queryKey: ['stats', 'exercises', exerciseId ?? '', 'outliers'] as const,
+    queryFn: () => api<SessionReview[]>(`/stats/exercises/${exerciseId}/outliers`),
+    enabled: Boolean(exerciseId),
+  })
+}
+
+/** One session of an exercise, picked from a chart, with the sessions either side. */
+export function useSessionReview(exerciseId: string | undefined, workoutId: string | undefined) {
+  return useQuery({
+    queryKey: ['stats', 'exercises', exerciseId ?? '', 'sessions', workoutId ?? ''] as const,
+    queryFn: () => api<SessionReview>(`/stats/exercises/${exerciseId}/sessions/${workoutId}`),
+    enabled: Boolean(exerciseId && workoutId),
+    // What is on screen is about to be edited; a refetch landing mid-edit is not wanted.
+    staleTime: Infinity,
+  })
+}
+
+export interface SetCorrection {
+  id: string
+  weightKg?: number | null
+  reps?: number | null
+  durationSeconds?: number | null
+  distanceM?: number | null
+}
+
+/**
+ * Corrects one exercise's sets in a saved workout: new values for `update`, gone for `remove`.
+ * Every statistic is worked out from the sets, so all of them are refetched.
+ */
+export function useCorrectSets() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ workoutId, workoutExerciseId, update, remove }: {
+      workoutId: string; workoutExerciseId: string; update?: SetCorrection[]; remove?: string[]
+    }) =>
+      api<Workout>(`/workouts/${workoutId}/exercises/${workoutExerciseId}/sets`, {
+        method: 'PATCH',
+        body: { update: update ?? [], remove: remove ?? [] },
+      }),
+    onSuccess: () => invalidateTraining(qc),
   })
 }
 

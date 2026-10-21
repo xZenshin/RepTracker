@@ -321,3 +321,32 @@ export interface MergeSummary {
   routines: number
   hidden: boolean
 }
+
+export interface SuggestedSet {
+  setId: string
+  weightKg?: number | null
+  reps?: number | null
+  durationSeconds?: number | null
+  distanceM?: number | null
+}
+
+/**
+ * One session of an exercise, for correcting: as logged, beside the sessions either side, with
+ * `suggested` values for each set worked out from them. A flagged mistake always has both
+ * neighbours; the first and latest session lack one.
+ */
+export interface SessionReview {
+  workoutId: string
+  workoutExerciseId: string
+  startedAt: string
+  modality: Modality
+  sets: WorkoutSet[]
+  suggested: SuggestedSet[]
+  before?: SessionNeighbour | null
+  after?: SessionNeighbour | null
+}
+
+export interface SessionNeighbour {
+  startedAt: string
+  sets: PreviousSet[]
+}

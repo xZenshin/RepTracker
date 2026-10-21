@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using RepTracker.Api.Auth;
+using RepTracker.Api.Data;
 using RepTracker.Api.Stats;
 
 namespace RepTracker.Api.Endpoints;
@@ -14,6 +15,8 @@ public static class StatsEndpoints
         group.MapGet("/calendar", Calendar);
         group.MapGet("/exercises", ExerciseList);
         group.MapGet("/exercises/{id:guid}", Exercise);
+        group.MapGet("/exercises/{id:guid}/outliers", ExerciseOutliers);
+        group.MapGet("/exercises/{id:guid}/sessions/{workoutId:guid}", ExerciseSession);
     }
 
     private static async Task<IResult> Overview(
@@ -49,6 +52,22 @@ public static class StatsEndpoints
             user.Id, id, user.BodyWeightKg, Validation.Weeks(weeks, 52), Offset(offsetMinutes), ct);
 
         return result is null ? Results.NotFound() : Results.Ok(result);
+    }
+
+    /// <summary>Sessions of this exercise that look like logging mistakes. See <see cref="Outliers"/>.</summary>
+    private static async Task<IResult> ExerciseOutliers(Guid id, AppDb db, HttpContext ctx, CancellationToken ct)
+    {
+        var user = ctx.CurrentUser();
+        return Results.Ok(await Outliers.FindAsync(db, user.Id, id, user.Units, ct));
+    }
+
+    /// <summary>One session of this exercise, picked from a chart, for correcting by hand.</summary>
+    private static async Task<IResult> ExerciseSession(
+        Guid id, Guid workoutId, AppDb db, HttpContext ctx, CancellationToken ct)
+    {
+        var user = ctx.CurrentUser();
+        var review = await Outliers.ReviewAsync(db, user.Id, id, workoutId, user.Units, ct);
+        return review is null ? Results.NotFound() : Results.Ok(review);
     }
 
     /// <summary>

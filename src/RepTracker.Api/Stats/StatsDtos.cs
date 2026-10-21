@@ -83,3 +83,17 @@ public record RepRecordDto(decimal WeightKg, int Reps, DateOnly AchievedAt);
 /// half. Reported as null when there is not enough data for the comparison to mean anything.
 /// </summary>
 public record TrendDto(decimal? ChangePercent, decimal? RecentAvg, decimal? EarlierAvg, string Direction);
+
+/// <summary>
+/// One session of an exercise for correcting: its sets as logged, a suggested replacement for each,
+/// and the sessions either side that the suggestion is worked out from - absent for the first and
+/// the latest session, on the side that has none. A flagged mistake always has both.
+/// </summary>
+public record SessionReviewDto(
+    Guid WorkoutId, Guid WorkoutExerciseId, DateTimeOffset StartedAt, Modality Modality,
+    List<Endpoints.SetDto> Sets, List<SuggestedSetDto> Suggested,
+    SessionNeighbourDto? Before, SessionNeighbourDto? After);
+
+public record SuggestedSetDto(Guid SetId, decimal? WeightKg, int? Reps, int? DurationSeconds, decimal? DistanceM);
+
+public record SessionNeighbourDto(DateTimeOffset StartedAt, List<Endpoints.PreviousSetDto> Sets);

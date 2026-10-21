@@ -14,12 +14,63 @@ public static class WorkoutEndpoints
         var group = app.MapGroup("/api/workouts").RequireAuthorization();
 
         // A workout in progress lives on the phone and never touches the server; it arrives here
-        // once, finished, in a single request. So there is nothing to start, edit or resume.
+        // once, finished, in a single request. So there is nothing to start or resume - only a saved
+        // workout's logging mistakes to correct after the fact.
         group.MapGet("/", List);
         group.MapGet("/previous", Previous);
         group.MapPost("/", Save).WithMetadata(new RequestSizeLimitAttribute(MaxSaveBytes));
         group.MapGet("/{id:guid}", Get);
         group.MapDelete("/{id:guid}", Delete);
+        group.MapPatch("/{id:guid}/exercises/{weId:guid}/sets", CorrectSets);
+    }
+
+    /// <summary>
+    /// Fixes one exercise's sets in a saved workout - a mistyped weight given new values, or a set
+    /// that should never have been logged removed. Nothing else in the workout is touched. An exercise
+    /// left with no sets leaves the workout with it; the workout itself stays, since it still happened.
+    /// Records, 1RM and volume are all worked out from the sets on every read, so they follow.
+    /// </summary>
+    private static async Task<IResult> CorrectSets(
+        Guid id, Guid weId, CorrectSetsRequest body, AppDb db, HttpContext ctx,
+        ClaimsPrincipal principal, CancellationToken ct)
+    {
+        var userId = principal.UserId();
+        var we = await db.WorkoutExercises
+            .Include(x => x.Sets)
+            .FirstOrDefaultAsync(x => x.Id == weId && x.WorkoutId == id && x.Workout.UserId == userId, ct);
+        if (we is null) return Results.NotFound();
+
+        var byId = we.Sets.ToDictionary(s => s.Id);
+        var update = body.Update ?? [];
+        var remove = body.Remove ?? [];
+        if (update.Any(u => !byId.ContainsKey(u.Id)) || remove.Any(r => !byId.ContainsKey(r)))
+            return Validation.Problem("A set to correct is not in that exercise.");
+
+        foreach (var change in update)
+        {
+            var set = byId[change.Id];
+            set.WeightKg = Validation.Weight(change.WeightKg);
+            set.Reps = Validation.Reps(change.Reps);
+            set.DurationSeconds = Validation.Duration(change.DurationSeconds);
+            set.DistanceM = Validation.Distance(change.DistanceM);
+        }
+
+        foreach (var setId in remove.Distinct())
+        {
+            we.Sets.Remove(byId[setId]);
+            db.Sets.Remove(byId[setId]);
+        }
+
+        // Renumbered so positions stay a dense 0..n-1 and sets can be labelled by index.
+        var position = 0;
+        foreach (var set in we.Sets.OrderBy(s => s.Position)) set.Position = position++;
+
+        if (we.Sets.Count == 0) db.WorkoutExercises.Remove(we);
+
+        await db.SaveChangesAsync(ct);
+
+        var saved = await FullQuery(db, userId).FirstAsync(w => w.Id == id, ct);
+        return Results.Ok(saved.ToDto(ctx.CurrentUser().BodyWeightKg));
     }
 
     /// <summary>
