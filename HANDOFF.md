@@ -34,8 +34,11 @@ architectural change, not a preference tweak.
    why there is no CORS config, no second host, no token juggling in the browser — just a
    same-site cookie. Splitting the frontend out later means adding all three back.
 2. **A server-generated numeric code is the whole credential.** No email, no password, no reset.
-3. **Online-only.** Every action is a request. This was chosen over a local-first PWA
-   deliberately; see [Things deliberately not built](#things-deliberately-not-built).
+3. **A workout in progress lives on the phone; only Finish sends it** (owner decision,
+   2026-10-21, replacing the original "every action is a request"). Over phone data every tick cost
+   two round trips before the screen moved on, and it felt unresponsive. The rest of the app -
+   history, stats, routines, settings - is still online-only, and there is no offline mode; see
+   [Things deliberately not built](#things-deliberately-not-built).
 4. **Routine templates plus ad-hoc sessions.** Both paths exist and share the same workout model.
 
 ---
@@ -66,11 +69,10 @@ fresh clone that runs only `dotnet run` serves no UI — build the web app first
 
 ```
 /api/auth        POST register, POST login, POST logout, GET/PATCH/DELETE me
-/api/exercises   GET, POST, PATCH :id, DELETE :id
+/api/exercises   GET, POST, PATCH :id, DELETE :id, POST merge (?commit=true writes)
 /api/routines    GET, GET :id, POST, PUT :id, DELETE :id
-/api/workouts    GET, GET active, POST, GET :id, PATCH :id, DELETE :id
-                 POST/PUT/PATCH/DELETE .../exercises[/order|/:weId], POST .../exercises/:weId/swap
-                 POST/PATCH/DELETE .../exercises/:weId/sets[/:setId]
+/api/workouts    GET (history), GET previous (last time's sets), POST (save a finished
+                 workout), GET :id, DELETE :id
 /api/import      POST workouts (raw text/csv; ?commit=true writes)
 /api/export      GET workouts (CSV download)
 /api/stats       GET overview, calendar, exercises, exercises/:id
@@ -110,14 +112,36 @@ display conversion in `lib/units.ts`. Switching units never rewrites history. Th
 step (`User.WeightStepKg`, Settings) follows the same rule, at three decimal places so a 5 lb step
 round-trips as 5; null means the per-unit default in `lib/units.ts`.
 
-**One active workout per user is enforced by a partial unique index**
-(`IX_Workouts_OneActivePerUser`), not just by the handler's check. A double-tapped "Start" races
-past the check; `WorkoutEndpoints.Start` catches the resulting `DbUpdateException` and returns
-409 with the workout that won, which the client treats as "resume".
+**The workout in progress is never on the server** (2026-10-21). `lib/liveWorkout.ts` holds it in
+`localStorage` (`rt.workout`), tagged with the user's id so another account on the same phone does
+not see it, and every edit - log, tick, edit, delete a set, add, swap, remove an exercise, change
+rest - is a pure function over it, so a tap never waits on the network. Starting makes one request,
+`GET /api/workouts/previous`: last time's sets for *every* exercise trained in the last 400 days, so
+adding or swapping one mid-workout prefills without another. With no signal, Start opens the workout
+without them rather than not at all. Finish sends the whole thing once, `POST /api/workouts`, completed
+sets only. Consequences worth knowing:
+- *A save is idempotent.* The phone mints the workout's id, and the server answers a second save of
+  the same id with the stored workout. That is what makes it safe for `useSaveWorkout` to retry a
+  dropped connection, and for the user to just tap Finish again. It runs with `networkMode: 'always'`,
+  so with no connection it fails and says so instead of sitting on "Saving..." indefinitely.
+- *A failed save loses nothing.* The local copy is cleared only after the server has it.
+- *An unfinished workout exists on one device.* The desktop does not show it as in progress, and
+  clearing the browser's data, or a private tab, loses it before it is saved. Accepted by the owner.
+- *The phone enforces the per-workout caps* (`MAX_EXERCISES`, `MAX_SETS`, mirroring the defaults in
+  `AppOptions.Limits`) so a workout cannot grow into one the save would refuse. The server checks
+  them again, along with the account's workout cap, and clamps every value as it always has.
+- *The phone's clock dates the workout.* The server clamps start and set times into the past, and
+  stamps `FinishedAt` itself on save. Rows saved since this change always have it; the column stays
+  nullable for history. Migration `SaveWorkoutsWhenFinished` closed out any workout left open on the
+  server the way Finish did (unticked sets and empty exercises dropped, finished at its last ticked
+  set) and dropped the one-open-workout index, which no longer has anything to guard.
+- *The saved workout's page is lazy-loaded*, so the workout screen stays mounted while it arrives.
+  `ActiveWorkout` sets a `leaving` ref before clearing the workout, or its "no workout, go home"
+  effect fires first and Finish lands on Train instead of the saved workout.
 
-**Live totals are computed client-side** in `lib/totals.ts`, mirroring `Stats/Formulas.cs`. Set
-edits are written straight into the query cache to stop the row flickering under your thumb, which
-leaves the server's totals a step behind. **If you change a volume rule, change it in both files.**
+**Totals for the workout in progress are computed on the phone** in `lib/totals.ts`, mirroring
+`Stats/Formulas.cs`, since the server has not seen the workout. **If you change a volume rule,
+change it in both files.**
 
 **The live workout shows one exercise at a time.** The big steppers (`LogSetCard`) edit the next
 unticked set, or a new one once the plan runs out, and the tick writes and completes it in one
@@ -127,7 +151,7 @@ rest timer, so a reload lands back on it. On a phone the tab bar is hidden on `/
 
 **A workout exercise opens on last time's sets, not the routine's targets.** Starting a routine
 or adding an exercise copies the sets from the most recent finished workout containing that
-exercise (any routine, unticked), via `CarryOver` in `WorkoutEndpoints`. An
+exercise (any routine, unticked), via `carryOver` in `lib/liveWorkout.ts`. An
 exercise never done before starts clean: the routine's set count as empty rows, or no rows when
 added ad hoc. Routine target weight and reps are deliberately ignored here (owner decision,
 2026-10-19); they remain the written plan shown on the Train card. On such a first attempt, logging
@@ -135,7 +159,7 @@ a set copies its values into the still-empty rows after it (`logged` in `Exercis
 next set is prefilled and a blank row can never be ticked as an empty set.
 
 **Swapping an exercise mid-workout never rewrites sets already done** (2026-10-20). With nothing
-ticked yet, `POST .../exercises/:weId/swap` replaces the exercise where it stands; with sets done,
+ticked yet, `swapExercise` in `lib/liveWorkout.ts` replaces the exercise where it stands; with sets done,
 those stay with the original - rewriting them would falsify its history and PRs - and the substitute
 is inserted after it with the remaining set count. Either way it opens on its own last time's sets.
 The picker leads with substitutes from `lib/similar.ts`, which ranks by movement family (a
@@ -144,8 +168,9 @@ before muscle group, since "Back" alone would offer a deadlift for a lat pulldow
 
 **The editors avoid effect-based state sync.** `SetRow` skips its re-sync while one of its own
 inputs holds focus; `RoutineEditor` and `LogSetCard` seed during render against the id of what they
-are editing. All guard the same bug: a refetch landing mid-edit replacing a value under the cursor. This is routine on a
-phone, where tabbing away and back triggers a refetch.
+are editing. All guard the same bug: an update landing mid-edit replacing a value under the
+cursor. With the workout on the phone that is now another tab, or a value copied forward into
+the empty rows after a logged set, rather than a refetch - but the guard still earns its keep.
 
 **Never call `queryClient.clear()` to sign out.** It removes the query objects that mounted
 observers are attached to, and those observers keep reading the removed entry — so the `useMe()` in
@@ -217,6 +242,32 @@ imported, untimed one - is written as the date alone, so an imported log comes b
 in. Verified by round trip: the owner's file imported, exported and compared line by line differs
 only by the importer's documented changes (empty sets dropped, plural names matched, week-year dates
 fixed, a superset's sets grouped under their exercise), and re-imports as 563 duplicates.
+
+**Two exercises can be merged into one** (Stats > Exercises, "Merge exercises", 2026-10-21, owner
+decision). Tick two rows, choose which to keep, read the preview, confirm. `POST /api/exercises/merge`
+previews without `?commit=true`, the import's pattern. It moves every logged set of the other
+exercise to the kept one and switches routines over. Where one workout has both, the sets are combined
+under the kept row, ordered by completion time, then by where each exercise sat in the workout. Where
+one routine has both, the other's row is dropped. Things that will look odd:
+- *A built-in exercise is hidden, not deleted.* The catalogue is shared, so merging one away hides it
+  for that account only (`ExerciseMerges` row; the exercise list filters on it). A user's own exercise
+  is deleted.
+- *The merge is remembered* (`ExerciseMerge`, keyed by user and merged-away id, with no foreign key on
+  that id because the exercise may be gone). Workout save and routine save redirect ids through it,
+  since a phone can hold a workout started before the merge and an editor can be open in another tab.
+  The CSV import maps the old name to the kept exercise, unless a visible exercise now has that name.
+  Merging the kept exercise away later re-points earlier rows, so a redirect is always one hop.
+- *Different kinds cannot merge* (a plank's seconds are not a press's kilograms). The server refuses,
+  and the sheet shows why.
+- *It cannot be undone.* The preview says so.
+
+**Editing a routine saved nothing until 2026-10-21.** Every `PUT /api/routines/:id` with exercises
+failed with a 500 (`DbUpdateConcurrencyException`) from the first commit on, found while testing
+merges. New rows carry their own ids, and reached only through a routine EF already tracks, EF took
+them for existing rows and issued updates that matched nothing. Creating worked because the whole
+routine was new. `ApplyExercisesAsync` now adds each row through the context, and only there, because
+EF attaches it to the routine itself and adding it to the collection too lists it twice. The same trap
+applies to any new child row with a preset id added under a tracked parent.
 
 **There are no warm-up sets** (removed 2026-10-20, owner decision; migration `RemoveWarmupSets`).
 Every completed set counts towards volume, hard sets and records. No set in the database was marked
@@ -313,6 +364,8 @@ system. That is the central gap; see the next section.
 | All five API groups, unauthenticated | 401 |
 | SPA deep links (`/stats`, `/history/:id`) | 200 |
 | `/assets/nope.js` | 404 — the fallback correctly excludes file-shaped paths |
+| Merge, against a throwaway account (25 checks) | preview counts, combined workouts, routines, redirects on save and import, hide vs delete, chained merges, refusals; demo account unaffected |
+| `/api/nope`, any method | 404 — an unknown API path is not handed the SPA shell (fixed 2026-10-21; it used to answer 200 with HTML) |
 | Hashed assets / SPA shell | `immutable` / `no-cache` |
 | Session cookie | `HttpOnly`, `SameSite=Lax`, `Secure` under TLS |
 | Wrong pepper | every existing code rejected, exactly as documented |
@@ -368,7 +421,9 @@ Ordered by what to fix first.
 
 Not oversights. Each was considered and declined for a stated reason.
 
-- **Offline / PWA.** Explicitly chosen against in favour of "online-only, simplest". The rest timer
+- **Offline / PWA.** Explicitly chosen against in favour of "online-only, simplest". Since
+  2026-10-21 a workout in progress needs no connection until Finish, but the app itself still has to
+  load, and history, stats and routines are fetched live. The rest timer
   and elapsed clock are still wall-clock based, so they behave correctly across a locked screen —
   that is timer correctness, not offline support. Revisiting this is the single biggest UX upgrade
   available, and the single biggest piece of work.

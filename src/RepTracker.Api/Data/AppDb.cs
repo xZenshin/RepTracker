@@ -12,6 +12,7 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
     public DbSet<Workout> Workouts => Set<Workout>();
     public DbSet<WorkoutExercise> WorkoutExercises => Set<WorkoutExercise>();
     public DbSet<WorkoutSet> Sets => Set<WorkoutSet>();
+    public DbSet<ExerciseMerge> ExerciseMerges => Set<ExerciseMerge>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -41,6 +42,16 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
                 .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        b.Entity<ExerciseMerge>(e =>
+        {
+            // An exercise is merged away once per user; merging into it later re-points the row.
+            e.HasKey(x => new { x.UserId, x.FromExerciseId });
+            e.HasOne(x => x.User).WithMany()
+                .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Into).WithMany()
+                .HasForeignKey(x => x.IntoExerciseId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         b.Entity<Routine>(e =>
         {
             e.HasIndex(x => new { x.UserId, x.IsArchived });
@@ -62,10 +73,6 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
         b.Entity<Workout>(e =>
         {
             e.HasIndex(x => new { x.UserId, x.StartedAt });
-            // At most one workout in progress per user, enforced by the database itself.
-            e.HasIndex(x => x.UserId).IsUnique()
-                .HasFilter("\"FinishedAt\" IS NULL")
-                .HasDatabaseName("IX_Workouts_OneActivePerUser");
             e.HasOne(x => x.User).WithMany(x => x.Workouts)
                 .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Routine).WithMany()

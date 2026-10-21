@@ -4,6 +4,7 @@ import { useDeleteAccount, useLogout, useMe, useUpdateMe } from '../api/hooks'
 import type { Units } from '../api/types'
 import { defaultWeightStep, toDisplay, toKg, weightStep } from '../lib/units'
 import { formatDateFull } from '../lib/time'
+import { clearLiveWorkout } from '../lib/liveWorkout'
 import { AlertIcon } from '../components/Icons'
 import ExportWorkouts from '../components/ExportWorkouts'
 import ImportWorkouts from '../components/ImportWorkouts'
@@ -151,7 +152,8 @@ export default function Settings() {
         </button>
 
         <DangerZone
-          onConfirm={() => deleteAccount.mutate()}
+          // A workout left open on this phone belonged to the account; it goes with it.
+          onConfirm={() => deleteAccount.mutate(undefined, { onSuccess: clearLiveWorkout })}
           pending={deleteAccount.isPending}
         />
       </section>

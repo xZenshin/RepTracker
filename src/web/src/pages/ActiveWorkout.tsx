@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  useActiveWorkout, useAddSet, useAddWorkoutExercise, useDeleteSet, useDeleteWorkout, useExercises,
-  useMe, useRemoveWorkoutExercise, useSwapWorkoutExercise, useUpdateSet, useUpdateWorkout,
-  useUpdateWorkoutExercise,
-} from '../api/hooks'
-import type { Exercise, Modality, PreviousSet, Units, Workout, WorkoutExercise, WorkoutSet } from '../api/types'
+import { useExercises, useLastTime, useMe, useSaveWorkout } from '../api/hooks'
+import type { Exercise, Modality, PreviousSet, Units, WorkoutExercise, WorkoutSet } from '../api/types'
 import { ApiError } from '../api/client'
+import {
+  MAX_SETS, addExercise, addSet, clearLiveWorkout, editLiveWorkout, newId, removeExercise, removeSet,
+  setRest, swapExercise, toSaveRequest, updateSet, useLiveWorkout, type LiveWorkout,
+} from '../lib/liveWorkout'
 import { formatVolume, formatWeight, toDisplay, toKg, weightStep } from '../lib/units'
 import { formatDuration, formatRelative } from '../lib/time'
 import { useElapsed } from '../lib/useElapsed'
@@ -31,32 +31,29 @@ const CURRENT_KEY = 'rt.current-exercise'
 /**
  * One exercise at a time, full screen: dial in the next set, tick it, rest, repeat - then move on.
  * Everything else (the other exercises, rest length, finishing) is one tap away in a sheet.
+ *
+ * The workout lives on the phone (lib/liveWorkout) until it is finished, so every tap here is a
+ * local edit and the screen never waits on the network. Only Finish talks to the server.
  */
 export default function ActiveWorkout() {
   const navigate = useNavigate()
-  const { data: workout, isPending } = useActiveWorkout()
+  const workout = useLiveWorkout()
   const { data: user } = useMe()
   const rest = useRestTimer()
   const [selectedId, setSelectedId] = useState<string | null>(readCurrent)
   const [sheet, setSheet] = useState<OpenSheet>(null)
 
-  const addExercise = useAddWorkoutExercise(workout?.id ?? '')
-  const swapExercise = useSwapWorkoutExercise(workout?.id ?? '')
   const { data: catalogue } = useExercises()
+  // Fetched when the workout started; an exercise added or swapped in prefills from it.
+  const { data: lastTime = {} } = useLastTime()
+
+  // Set on the way out after a save. The saved workout's page is lazy-loaded, so this page stays
+  // mounted while it arrives - and without this, clearing the workout would send it to Train first.
+  const leaving = useRef(false)
 
   useEffect(() => {
-    if (!isPending && !workout) navigate('/', { replace: true })
-  }, [isPending, workout, navigate])
-
-  if (isPending) {
-    return (
-      <main className="page workout-page">
-        <div className="skeleton" style={{ height: 52, width: 52, marginBottom: 18 }} />
-        <div className="skeleton" style={{ height: 40, marginBottom: 16 }} />
-        <div className="skeleton" style={{ height: 230 }} />
-      </main>
-    )
-  }
+    if (!workout && !leaving.current) navigate('/', { replace: true })
+  }, [workout, navigate])
 
   if (!workout) return null
 
@@ -93,7 +90,6 @@ export default function ActiveWorkout() {
       {current ? (
         <ExerciseFocus
           key={current.id}
-          workoutId={workout.id}
           workoutName={workout.name}
           exercise={current}
           position={index + 1}
@@ -149,12 +145,9 @@ export default function ActiveWorkout() {
           usedIds={new Set(exercises.map((we) => we.exerciseId))}
           onClose={() => setSheet(null)}
           onPick={(exercise) => {
-            addExercise.mutate(exercise.id, {
-              onSuccess: (updated) => {
-                const added = updated.exercises.filter((we) => we.exerciseId === exercise.id).at(-1)
-                if (added) select(added.id)
-              },
-            })
+            const id = newId()
+            editLiveWorkout((w) => addExercise(w, exercise, lastTime, id))
+            select(id)
             setSheet(null)
           }}
         />
@@ -170,17 +163,12 @@ export default function ActiveWorkout() {
           }}
           onClose={() => setSheet(null)}
           onPick={(exercise) => {
-            const replaced = current.id
-            swapExercise.mutate({ weId: replaced, exerciseId: exercise.id }, {
-              onSuccess: (updated) => {
-                // Replaced where it stood, or - with sets already done - followed by the substitute.
-                const same = updated.exercises.find((we) => we.id === replaced)
-                const target = same && same.exerciseId === exercise.id
-                  ? same
-                  : updated.exercises[updated.exercises.findIndex((we) => we.id === replaced) + 1]
-                if (target) select(target.id)
-              },
-            })
+            // Replaced where it stands, keeping its id - or, with sets already done, followed by
+            // the substitute under a new one.
+            const substituteId = newId()
+            const keepsDone = current.sets.some((s) => s.isCompleted)
+            editLiveWorkout((w) => swapExercise(w, current.id, exercise, lastTime, substituteId))
+            select(keepsDone ? substituteId : current.id)
             setSheet(null)
           }}
         />
@@ -188,7 +176,6 @@ export default function ActiveWorkout() {
 
       {sheet === 'menu' ? (
         <WorkoutMenu
-          workoutId={workout.id}
           exercise={current}
           onClose={() => setSheet(null)}
           onSwap={() => setSheet('swap')}
@@ -202,6 +189,11 @@ export default function ActiveWorkout() {
           units={units}
           bodyWeightKg={user?.bodyWeightKg}
           onClose={() => setSheet(null)}
+          onSaved={(id) => {
+            leaving.current = true
+            navigate(`/history/${id}`, { replace: true })
+            clearLiveWorkout()
+          }}
         />
       ) : null}
     </main>
@@ -218,9 +210,8 @@ function swapCandidates(current: WorkoutExercise, catalogue: Exercise[]) {
 }
 
 function ExerciseFocus({
-  workoutId, workoutName, exercise, position, count, units, weightStep, onLogged, onSwap,
+  workoutName, exercise, position, count, units, weightStep, onLogged, onSwap,
 }: {
-  workoutId: string
   workoutName: string
   exercise: WorkoutExercise
   position: number
@@ -232,7 +223,6 @@ function ExerciseFocus({
 }) {
   const previous = exercise.previous
   const fields = fieldsFor(exercise.modality, units, weightStep)
-  const updateSet = useUpdateSet(workoutId)
 
   // The first time at an exercise there is no last time to lay the rows out from, so they start
   // empty. Once a set is logged, copy it into the empty rows after it: the next set is usually the
@@ -242,11 +232,12 @@ function ExerciseFocus({
     onLogged()
     if (previous || !hasValues(values)) return
 
-    for (const set of exercise.sets.slice(index + 1)) {
-      if (!set.isCompleted && !hasValues(set)) {
-        updateSet.mutate({ weId: exercise.id, setId: set.id, ...values })
-      }
-    }
+    editLiveWorkout((w) => {
+      const latest = w.exercises.find((we) => we.id === exercise.id)
+      return (latest?.sets.slice(index + 1) ?? [])
+        .filter((set) => !set.isCompleted && !hasValues(set))
+        .reduce((next, set) => updateSet(next, exercise.id, set.id, values), w)
+    })
   }
 
   return (
@@ -268,7 +259,7 @@ function ExerciseFocus({
         </button>
       </div>
 
-      <LogSetCard workoutId={workoutId} exercise={exercise} units={units} fields={fields} onLogged={logged} />
+      <LogSetCard exercise={exercise} units={units} fields={fields} onLogged={logged} />
 
       {exercise.sets.length > 0 ? (
         <div className="set-grid" role="table">
@@ -284,7 +275,6 @@ function ExerciseFocus({
           {exercise.sets.map((set, i) => (
             <SetRow
               key={set.id}
-              workoutId={workoutId}
               weId={exercise.id}
               set={set}
               index={i}
@@ -301,43 +291,42 @@ function ExerciseFocus({
 }
 
 /**
- * The big steppers. They edit the next unticked set if there is one (the server lays an exercise
- * out as last time's sets), and otherwise a new set; the tick writes it and marks it done in one go.
+ * The big steppers. They edit the next unticked set if there is one (an exercise opens on last
+ * time's sets), and otherwise a new set; the tick writes it and marks it done in one go.
  */
 function LogSetCard({
-  workoutId, exercise, units, fields, onLogged,
+  exercise, units, fields, onLogged,
 }: {
-  workoutId: string
   exercise: WorkoutExercise
   units: Units
   fields: FieldSpec[]
   /** With the set's position and the values it was logged with. */
   onLogged: (index: number, values: SetValues) => void
 }) {
-  const addSet = useAddSet(workoutId)
-  const updateSet = useUpdateSet(workoutId)
-
   const target = exercise.sets.find((s) => !s.isCompleted)
   const seedKey = `${target?.id ?? 'new'}:${exercise.sets.length}`
   const [seededFor, setSeededFor] = useState(seedKey)
   const [values, setValues] = useState(() => seedValues(exercise, target, units))
 
   // Re-seed only when the set being logged changes - after a tick moves on to the next one.
-  // Done during render against the target's id rather than in an effect, so a background refetch
-  // of the same set never resets a number while it is being dialled in.
+  // Done during render against the target's id rather than in an effect, so an edit elsewhere -
+  // another tab, a copied-forward row - never resets a number while it is being dialled in.
   if (seededFor !== seedKey) {
     setSeededFor(seedKey)
     setValues(seedValues(exercise, target, units))
   }
 
-  const busy = addSet.isPending || updateSet.isPending
   const empty = !values.primary.trim() && !values.secondary.trim()
+  const full = !target && exercise.sets.length >= MAX_SETS
   const setNumber = target ? exercise.sets.indexOf(target) + 1 : exercise.sets.length + 1
 
   function log() {
     const parsed = parseInputs(values.primary, values.secondary, exercise.modality, units)
-    if (target) updateSet.mutate({ weId: exercise.id, setId: target.id, ...parsed, isCompleted: true })
-    else addSet.mutate({ weId: exercise.id, ...parsed, isCompleted: true })
+    editLiveWorkout((w) =>
+      target
+        ? updateSet(w, exercise.id, target.id, { ...parsed, isCompleted: true })
+        : addSet(w, exercise.id, parsed, true),
+    )
     onLogged(setNumber - 1, parsed)
   }
 
@@ -378,7 +367,7 @@ function LogSetCard({
       </div>
 
       <div className="log-action">
-        <button className="log-btn" type="button" disabled={busy || empty} onClick={log} aria-label={`Log set ${setNumber}`}>
+        <button className="log-btn" type="button" disabled={empty || full} onClick={log} aria-label={`Log set ${setNumber}`}>
           <CheckIcon />
         </button>
         <span className="log-caption">
@@ -390,9 +379,8 @@ function LogSetCard({
 }
 
 function SetRow({
-  workoutId, weId, set, index, modality, units, fields, onCompleted,
+  weId, set, index, modality, units, fields, onCompleted,
 }: {
-  workoutId: string
   weId: string
   set: WorkoutSet
   index: number
@@ -401,18 +389,15 @@ function SetRow({
   fields: FieldSpec[]
   onCompleted: (values: SetValues) => void
 }) {
-  const update = useUpdateSet(workoutId)
-  const remove = useDeleteSet(workoutId)
-
-  // Held locally while typing so the field never fights the cache mid-keystroke; committed on blur.
+  // Held locally while typing so the field never fights the workout mid-keystroke; committed on blur.
   const [primary, setPrimary] = useState(() => primaryValue(set, modality, units))
   const [secondary, setSecondary] = useState(() => secondaryValue(set, modality))
   const rowRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Re-sync when the server's view of this set changes - but never over an input that currently
-    // has the cursor in it, or a refetch triggered by tabbing back to the app would wipe out a
-    // half-entered number.
+    // Re-sync when the stored set changes - but never over an input that currently has the cursor
+    // in it, or an edit landing from elsewhere (a copied-forward value, another tab) would wipe out
+    // a half-entered number.
     if (rowRef.current?.contains(document.activeElement)) return
 
     setPrimary(primaryValue(set, modality, units))
@@ -421,7 +406,7 @@ function SetRow({
 
   function commit(extra?: { isCompleted?: boolean }) {
     const values = parseInputs(primary, secondary, modality, units)
-    update.mutate({ weId, setId: set.id, ...values, ...extra })
+    editLiveWorkout((w) => updateSet(w, weId, set.id, { ...values, ...extra }))
     return values
   }
 
@@ -468,7 +453,7 @@ function SetRow({
       <button
         className="set-delete"
         type="button"
-        onClick={() => remove.mutate({ weId, setId: set.id })}
+        onClick={() => editLiveWorkout((w) => removeSet(w, weId, set.id))}
         aria-label={`Delete set ${index + 1}`}
       >
         <TrashIcon />
@@ -491,7 +476,7 @@ const FALLBACK_REST = 90
 function Dock({
   workout, current, rest, hasPrev, hasNext, onExercises, onPrev, onNext, onDone,
 }: {
-  workout: Workout
+  workout: LiveWorkout
   current: WorkoutExercise | undefined
   rest: RestTimer
   hasPrev: boolean
@@ -643,17 +628,13 @@ function ExercisesSheet({
 }
 
 function WorkoutMenu({
-  workoutId, exercise, onClose, onSwap, onFinish,
+  exercise, onClose, onSwap, onFinish,
 }: {
-  workoutId: string
   exercise: WorkoutExercise | undefined
   onClose: () => void
   onSwap: () => void
   onFinish: () => void
 }) {
-  const removeExercise = useRemoveWorkoutExercise(workoutId)
-  const updateExercise = useUpdateWorkoutExercise(workoutId)
-
   return (
     <Sheet title={exercise?.exerciseName ?? 'Workout'} onClose={onClose}>
       {exercise ? (
@@ -664,7 +645,7 @@ function WorkoutMenu({
               className="select"
               value={exercise.restSeconds}
               onChange={(event) => {
-                updateExercise.mutate({ weId: exercise.id, restSeconds: Number(event.target.value) })
+                editLiveWorkout((w) => setRest(w, exercise.id, Number(event.target.value)))
               }}
             >
               {[0, 45, 60, 75, 90, 120, 150, 180, 240, 300].map((seconds) => (
@@ -685,7 +666,7 @@ function WorkoutMenu({
             type="button"
             onClick={() => {
               if (confirm(`Remove ${exercise.exerciseName} and its sets from this workout?`)) {
-                removeExercise.mutate(exercise.id)
+                editLiveWorkout((w) => removeExercise(w, exercise.id))
                 onClose()
               }
             }}
@@ -701,23 +682,27 @@ function WorkoutMenu({
       <button className="btn primary block" type="button" onClick={onFinish}>
         Finish workout
       </button>
+      <DiscardWorkoutButton />
     </Sheet>
   )
 }
 
+/**
+ * The one moment the workout goes to the server. If the save fails it stays on the phone, untouched,
+ * and Finish can simply be tapped again: the server recognises a workout it already has.
+ */
 function FinishSheet({
-  workout, units, bodyWeightKg, onClose,
+  workout, units, bodyWeightKg, onClose, onSaved,
 }: {
-  workout: Workout
+  workout: LiveWorkout
   units: Units
   bodyWeightKg: number | null | undefined
   onClose: () => void
+  onSaved: (id: string) => void
 }) {
-  const navigate = useNavigate()
-  const update = useUpdateWorkout()
-  const remove = useDeleteWorkout()
+  const save = useSaveWorkout()
   const [name, setName] = useState(workout.name)
-  const [notes, setNotes] = useState(workout.notes ?? '')
+  const [notes, setNotes] = useState('')
   const totals = computeTotals(workout, bodyWeightKg)
 
   const emptySets = workout.exercises.reduce(
@@ -755,36 +740,47 @@ function FinishSheet({
         />
       </label>
 
-      {update.error ? <p className="banner">{(update.error as ApiError).message}</p> : null}
+      {save.error ? (
+        <p className="banner">
+          {save.error instanceof ApiError
+            ? save.error.message
+            : 'Could not reach the server. The workout is still on this phone - try again when you have signal.'}
+        </p>
+      ) : null}
 
       <button
         className="btn primary lg block"
         type="button"
-        disabled={update.isPending}
+        disabled={save.isPending}
         onClick={() => {
-          const trimmed = name.trim()
-          update.mutate(
-            { id: workout.id, name: trimmed && trimmed !== workout.name ? trimmed : undefined, notes, finish: true },
-            { onSuccess: () => navigate(`/history/${workout.id}`, { replace: true }) },
-          )
+          save.mutate(toSaveRequest(workout, name, notes), { onSuccess: (saved) => onSaved(saved.id) })
         }}
       >
-        {update.isPending ? 'Saving...' : 'Finish and save'}
+        {save.isPending ? 'Saving...' : 'Finish and save'}
       </button>
 
-      <button
-        className="btn danger block"
-        type="button"
-        style={{ marginTop: 10 }}
-        onClick={() => {
-          if (confirm('Discard this workout completely? Everything logged in it is lost.')) {
-            remove.mutate(workout.id, { onSuccess: () => navigate('/', { replace: true }) })
-          }
-        }}
-      >
-        Discard workout
-      </button>
+      <DiscardWorkoutButton disabled={save.isPending} />
     </Sheet>
+  )
+}
+
+/** Nothing to tell the server: the workout only ever existed on this phone. */
+function DiscardWorkoutButton({ disabled = false }: { disabled?: boolean }) {
+  const navigate = useNavigate()
+
+  return (
+    <button
+      className="btn danger block"
+      type="button"
+      style={{ marginTop: 10 }}
+      disabled={disabled}
+      onClick={() => {
+        navigate('/', { replace: true })
+        clearLiveWorkout()
+      }}
+    >
+      Discard workout
+    </button>
   )
 }
 
@@ -874,8 +870,7 @@ function stepValue(text: string, field: FieldSpec, direction: 1 | -1): string {
 }
 
 /**
- * Where the steppers start: the set being logged, which the server prefilled with last time's
- * numbers; else, past the end of last time or on a first attempt, the last set done this session
+ * Where the steppers start: the set being logged, which opened on last time's numbers; else, past the end of last time or on a first attempt, the last set done this session
  * (the common "same again" case); else the matching set from last time. A first attempt with
  * nothing logged yet starts empty.
  */

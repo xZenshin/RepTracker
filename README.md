@@ -5,7 +5,8 @@ for a real screen afterwards.
 
 - **In the gym** — start from a saved routine or an empty session, log weight and reps a tap at a
   time, see what you lifted last time on the same row, and get a rest timer that keeps counting
-  while the screen is off.
+  while the screen is off. The workout stays on the phone until you finish it, so a tap never
+  waits on gym signal.
 - **At a desk** — weekly volume, hard sets per muscle group against an evidence-based target band,
   a consistency heatmap, estimated 1RM per exercise over time, personal records, and a nudge when
   a lift has stopped moving.

@@ -125,6 +125,10 @@ public static class RoutineEndpoints
 
         if (items.Count == 0) return null;
 
+        // An editor open since before a merge still names the exercise merged away.
+        var redirects = await ExerciseMerges.RedirectsAsync(db, userId, ct);
+        items = [.. items.Select(i => i with { ExerciseId = redirects.Resolve(i.ExerciseId) })];
+
         // One lookup confirms every referenced exercise both exists and is visible to this user,
         // which is what stops a caller from attaching another account's private exercise.
         var ids = items.Select(i => i.ExerciseId).Distinct().ToList();
@@ -138,7 +142,12 @@ public static class RoutineEndpoints
         var position = 0;
         foreach (var item in items)
         {
-            routine.Exercises.Add(new RoutineExercise
+            // Added through the context, not the routine's collection: these carry their own ids, and
+            // reached only through a routine EF already tracks (an edit, not a create) it would take
+            // them for existing rows and try to update them, failing the whole save. EF attaches each
+            // to the routine itself, now or when a new routine is added, so adding it there as well
+            // would list it twice.
+            var row = new RoutineExercise
             {
                 Id = Guid.CreateVersion7(),
                 RoutineId = routine.Id,
@@ -150,7 +159,9 @@ public static class RoutineEndpoints
                 TargetWeightKg = Validation.Weight(item.TargetWeightKg),
                 RestSeconds = Validation.Rest(item.RestSeconds),
                 Notes = Validation.Text(item.Notes, 200),
-            });
+            };
+
+            db.RoutineExercises.Add(row);
         }
 
         return null;

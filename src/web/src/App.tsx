@@ -1,6 +1,7 @@
 import { Suspense, lazy, useState, type ReactNode } from 'react'
 import { NavLink, Navigate, Route, Routes, useMatch, useNavigate } from 'react-router-dom'
-import { useActiveWorkout, useMe } from './api/hooks'
+import { useMe } from './api/hooks'
+import { useLiveWorkout } from './lib/liveWorkout'
 import { ChartIcon, DumbbellIcon, HistoryIcon, SettingsIcon } from './components/Icons'
 import { useIsDesktop } from './lib/useMediaQuery'
 import Login, { CodeIssued, type Mode } from './pages/Login'
@@ -106,7 +107,7 @@ function Lazy({ children }: { children: ReactNode }) {
 }
 
 function Nav() {
-  const { data: active } = useActiveWorkout()
+  const active = useLiveWorkout()
   const isDesktop = useIsDesktop()
 
   return (

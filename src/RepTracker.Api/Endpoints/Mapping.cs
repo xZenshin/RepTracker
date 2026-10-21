@@ -22,18 +22,14 @@ public static class Mapping
         new(s.Id, s.Position, s.WeightKg, s.Reps, s.DurationSeconds,
             s.DistanceM, s.Rpe, s.IsCompleted, s.CompletedAt);
 
-    public static WorkoutDto ToDto(
-        this Workout w,
-        decimal? bodyWeightKg,
-        IReadOnlyDictionary<Guid, PreviousPerformanceDto>? previous = null)
+    public static WorkoutDto ToDto(this Workout w, decimal? bodyWeightKg)
     {
         var exercises = w.Exercises
             .OrderBy(x => x.Position)
             .Select(x => new WorkoutExerciseDto(
                 x.Id, x.ExerciseId, x.Exercise.Name, x.Exercise.MuscleGroup, x.Exercise.Equipment,
                 x.Exercise.Modality, x.Position, x.RestSeconds, x.Notes,
-                [.. x.Sets.OrderBy(s => s.Position).Select(ToDto)],
-                previous is not null && previous.TryGetValue(x.ExerciseId, out var p) ? p : null))
+                [.. x.Sets.OrderBy(s => s.Position).Select(ToDto)]))
             .ToList();
 
         return new WorkoutDto(

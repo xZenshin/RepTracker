@@ -19,6 +19,17 @@ public record ExerciseDto(
 public record CreateExerciseRequest(string Name, string MuscleGroup, string Equipment, Modality Modality, string Pattern);
 public record UpdateExerciseRequest(string? Name, string? MuscleGroup, string? Equipment, string? Pattern, bool? IsArchived);
 
+/// <summary>Fold <see cref="FromId"/> into <see cref="IntoId"/>, keeping the second.</summary>
+public record MergeExercisesRequest(Guid FromId, Guid IntoId);
+
+/// <summary>
+/// What a merge did, or would do. <see cref="Combined"/> counts workouts that had both exercises,
+/// whose sets end up under one; <see cref="Hidden"/> is true when the merged-away exercise is a shared
+/// catalogue one, hidden for this user rather than deleted.
+/// </summary>
+public record MergeSummaryDto(
+    bool Committed, string From, string Into, int Workouts, int Sets, int Combined, int Routines, bool Hidden);
+
 // ---- routines ----
 public record RoutineDto(
     Guid Id, string Name, string? Notes, bool IsArchived,
@@ -35,8 +46,6 @@ public record SaveRoutineExercise(
     decimal? TargetWeightKg, int RestSeconds, string? Notes);
 
 // ---- workouts ----
-public record StartWorkoutRequest(Guid? RoutineId, string? Name);
-
 public record WorkoutDto(
     Guid Id, string Name, string? Notes, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt,
     Guid? RoutineId, string? RoutineName, WorkoutTotals Totals, List<WorkoutExerciseDto> Exercises);
@@ -46,14 +55,13 @@ public record WorkoutTotals(decimal VolumeKg, int Sets, int Reps, int? DurationS
 
 public record WorkoutExerciseDto(
     Guid Id, Guid ExerciseId, string ExerciseName, string MuscleGroup, string Equipment,
-    Modality Modality, int Position, int RestSeconds, string? Notes,
-    List<SetDto> Sets, PreviousPerformanceDto? Previous);
+    Modality Modality, int Position, int RestSeconds, string? Notes, List<SetDto> Sets);
 
 public record SetDto(
     Guid Id, int Position, decimal? WeightKg, int? Reps, int? DurationSeconds,
     decimal? DistanceM, decimal? Rpe, bool IsCompleted, DateTimeOffset? CompletedAt);
 
-/// <summary>What this exercise looked like last time, so the phone can prefill "80 kg x 8".</summary>
+/// <summary>What an exercise looked like last time, so the phone can prefill "80 kg x 8".</summary>
 public record PreviousPerformanceDto(DateTimeOffset PerformedAt, List<PreviousSetDto> Sets);
 public record PreviousSetDto(decimal? WeightKg, int? Reps, int? DurationSeconds, decimal? DistanceM);
 
@@ -62,20 +70,19 @@ public record WorkoutSummaryDto(
     string? RoutineName, decimal VolumeKg, int Sets, int Exercises, int? DurationSeconds,
     List<string> MuscleGroups);
 
-public record UpdateWorkoutRequest(string? Name, string? Notes, bool? Finish);
-public record AddWorkoutExerciseRequest(Guid ExerciseId);
+/// <summary>
+/// A finished workout, sent whole by the phone that logged it. The id is the phone's own, so a save
+/// retried after a lost response is recognised rather than stored twice. Only completed sets.
+/// </summary>
+public record SaveWorkoutRequest(
+    Guid Id, string? Name, string? Notes, DateTimeOffset StartedAt, Guid? RoutineId,
+    List<SaveWorkoutExercise> Exercises);
 
-/// <summary>The exercise to do instead, when the planned one's machine or bench is taken.</summary>
-public record SwapWorkoutExerciseRequest(Guid ExerciseId);
-public record UpdateWorkoutExerciseRequest(int? Position, int? RestSeconds, string? Notes);
+public record SaveWorkoutExercise(Guid ExerciseId, int RestSeconds, string? Notes, List<SaveWorkoutSet> Sets);
 
-public record CreateSetRequest(
-    decimal? WeightKg, int? Reps, int? DurationSeconds, decimal? DistanceM,
-    decimal? Rpe, bool? IsCompleted);
-
-public record UpdateSetRequest(
-    decimal? WeightKg, int? Reps, int? DurationSeconds, decimal? DistanceM,
-    decimal? Rpe, bool? IsCompleted);
+public record SaveWorkoutSet(
+    decimal? WeightKg, int? Reps, int? DurationSeconds, decimal? DistanceM, decimal? Rpe,
+    DateTimeOffset? CompletedAt);
 
 public record PagedResult<T>(List<T> Items, string? NextCursor);
 

@@ -1,10 +1,12 @@
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMe, useStatExercises } from '../api/hooks'
-import type { ExerciseListItem } from '../api/types'
+import type { ExerciseListItem, MergeSummary } from '../api/types'
 import { formatWeight } from '../lib/units'
 import { formatDate, formatRelative } from '../lib/time'
 import { AlertIcon, SearchIcon, TrophyIcon } from '../components/Icons'
 import StatsTabs from '../components/StatsTabs'
+import MergeExercises from '../components/MergeExercises'
 import '../styles/viz.css'
 import './exercise-list.css'
 
@@ -71,6 +73,23 @@ export default function ExerciseList() {
       return descending ? -order : order
     })
 
+  // Merging: the rows become tick boxes, and two ticked open the merge sheet. Picked by id, so a
+  // search or filter in between keeps what was already ticked.
+  const [merging, setMerging] = useState(false)
+  const [picked, setPicked] = useState<string[]>([])
+  const [confirming, setConfirming] = useState(false)
+  const [merged, setMerged] = useState<MergeSummary | null>(null)
+  const pair = picked.map((id) => all.find((item) => item.id === id)).filter((item) => item !== undefined)
+
+  const togglePick = (id: string) =>
+    setPicked((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id].slice(-2)))
+
+  const stopMerging = () => {
+    setMerging(false)
+    setPicked([])
+    setConfirming(false)
+  }
+
   const toggleSort = (key: SortKey) => {
     if (key === sort) update({ dir: descending ? 'asc' : 'desc' })
     else update({ sort: key === 'last' ? null : key, dir: null })
@@ -136,7 +155,44 @@ export default function ExerciseList() {
                 </button>
               ))}
             </div>
+
+            <button
+              className="btn sm exlist-merge-toggle"
+              type="button"
+              onClick={() => {
+                if (merging) stopMerging()
+                else {
+                  setMerging(true)
+                  setMerged(null)
+                }
+              }}
+            >
+              {merging ? 'Cancel' : 'Merge exercises'}
+            </button>
           </div>
+
+          {merging ? (
+            <div className="exlist-mergebar" role="status">
+              <span>
+                <b>Tick the two exercises to merge.</b>{' '}
+                <span className="faint tabular">{pair.length} of 2</span>
+              </span>
+              <button
+                className="btn primary sm"
+                type="button"
+                disabled={pair.length !== 2}
+                onClick={() => setConfirming(true)}
+              >
+                Merge...
+              </button>
+            </div>
+          ) : null}
+
+          {merged ? (
+            <p className="banner info exlist-merged">
+              Merged {merged.from} into {merged.into}: {merged.sets} set{merged.sets === 1 ? '' : 's'} moved.
+            </p>
+          ) : null}
 
           {rows.length === 0 ? (
             <p className="muted small exlist-none">
@@ -167,11 +223,23 @@ export default function ExerciseList() {
               </thead>
               <tbody>
                 {rows.map((item) => (
-                  <tr key={item.id}>
+                  <tr key={item.id} className={picked.includes(item.id) ? 'picked' : undefined}>
                     <td>
-                      <Link to={`/stats/exercises/${item.id}`} className="exlist-name">
-                        {item.name}
-                      </Link>
+                      {merging ? (
+                        // The label's overlay makes the whole row the tick target, as the link does.
+                        <label className="exlist-name exlist-pick">
+                          <input
+                            type="checkbox"
+                            checked={picked.includes(item.id)}
+                            onChange={() => togglePick(item.id)}
+                          />
+                          {item.name}
+                        </label>
+                      ) : (
+                        <Link to={`/stats/exercises/${item.id}`} className="exlist-name">
+                          {item.name}
+                        </Link>
+                      )}
                       <StatusChip item={item} />
                       <div className="faint small">{item.muscleGroup}</div>
                     </td>
@@ -193,6 +261,17 @@ export default function ExerciseList() {
           </p>
         </section>
       )}
+
+      {confirming && pair.length === 2 ? (
+        <MergeExercises
+          pair={[pair[0], pair[1]]}
+          onClose={() => setConfirming(false)}
+          onMerged={(summary) => {
+            stopMerging()
+            setMerged(summary)
+          }}
+        />
+      ) : null}
     </main>
   )
 }
