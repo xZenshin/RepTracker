@@ -154,3 +154,46 @@
   color: var(--text-dim);
   font-weight: 600;
 }
+
+/* ---- merging ---- */
+
+.exlist-merge-toggle {
+  margin-left: auto;
+}
+
+.exlist-mergebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 10px 10px 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  font-size: 0.9rem;
+}
+
+.exlist-merged {
+  margin-bottom: 14px;
+}
+
+.exlist-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.exlist-pick input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.exlist tbody tr.picked,
+.exlist tbody tr.picked:hover {
+  background: var(--accent-soft);
+}

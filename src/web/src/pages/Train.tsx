@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useActiveWorkout, useDeleteRoutine, useMe, useRoutines, useStartWorkout } from '../api/hooks'
-import { ApiError } from '../api/client'
+import { useQueryClient } from '@tanstack/react-query'
+import { lastTimeQuery, useDeleteRoutine, useExercises, useLastTime, useMe, useRoutines } from '../api/hooks'
+import type { Routine } from '../api/types'
+import { newWorkout, startLiveWorkout, useLiveWorkout } from '../lib/liveWorkout'
 import { formatDuration } from '../lib/time'
 import { formatWeight } from '../lib/units'
 import { ChevronIcon, PlusIcon, TimerIcon } from '../components/Icons'
@@ -10,24 +13,32 @@ import './train.css'
 export default function Train() {
   const navigate = useNavigate()
   const { data: user } = useMe()
-  const { data: active } = useActiveWorkout()
+  const active = useLiveWorkout()
   const { data: routines, isPending } = useRoutines()
-  const start = useStartWorkout()
+  const { data: catalogue = [] } = useExercises()
   const deleteRoutine = useDeleteRoutine()
+  const queryClient = useQueryClient()
+  const [starting, setStarting] = useState(false)
+
+  // Loaded with the page, so Start usually has last time's numbers in hand already.
+  useLastTime()
 
   const units = user?.units ?? 'kg'
 
-  function begin(routineId?: string) {
-    start.mutate(
-      { routineId },
-      {
-        onSuccess: () => navigate('/workout'),
-        // A 409 means a workout is already open. Going there is what the user wanted anyway.
-        onError: (error) => {
-          if (error instanceof ApiError && error.status === 409) navigate('/workout')
-        },
-      },
-    )
+  /**
+   * Opens a workout on this phone. The only request is for last time's sets, and only if they are
+   * not already loaded; with no signal it starts without them, since a workout with blank rows
+   * beats no workout at all.
+   */
+  async function begin(routine?: Routine) {
+    if (!user || starting) return
+    if (!active) {
+      setStarting(true)
+      const lastTime = await queryClient.fetchQuery(lastTimeQuery).catch(() => ({}))
+      startLiveWorkout(newWorkout(user.id, routine, lastTime, catalogue))
+      setStarting(false)
+    }
+    navigate('/workout')
   }
 
   return (
@@ -41,10 +52,13 @@ export default function Train() {
         </div>
       </div>
 
-      {active ? <ResumeCard onOpen={() => navigate('/workout')} startedAt={active.startedAt} name={active.name} sets={active.totals.sets} /> : null}
-
-      {start.error && !(start.error instanceof ApiError && start.error.status === 409) ? (
-        <p className="banner" style={{ marginBottom: 12 }}>{(start.error as ApiError).message}</p>
+      {active ? (
+        <ResumeCard
+          onOpen={() => navigate('/workout')}
+          startedAt={active.startedAt}
+          name={active.name}
+          sets={active.exercises.reduce((count, we) => count + we.sets.filter((s) => s.isCompleted).length, 0)}
+        />
       ) : null}
 
       <section>
@@ -93,8 +107,8 @@ export default function Train() {
                   <button
                     className="btn primary"
                     type="button"
-                    onClick={() => begin(routine.id)}
-                    disabled={start.isPending}
+                    onClick={() => begin(routine)}
+                    disabled={starting}
                   >
                     Start
                   </button>
@@ -136,7 +150,7 @@ export default function Train() {
           type="button"
           style={{ marginTop: 16 }}
           onClick={() => begin()}
-          disabled={start.isPending}
+          disabled={starting}
         >
           Start an empty workout
         </button>

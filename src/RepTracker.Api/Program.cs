@@ -139,6 +139,10 @@ app.MapStats();
 app.MapImport();
 app.MapExport();
 
+// An /api path that matches nothing is a 404, not the app's shell: a client calling a removed or
+// mistyped endpoint should hear that, not get HTML with a 200 and fail parsing it as JSON.
+app.MapFallback("/api/{**path}", () => Results.NotFound());
+
 // Anything that is not an API route is the single-page app, so deep links such as
 // /stats/<id> are served the shell and routed in the browser.
 app.MapFallbackToFile("index.html");

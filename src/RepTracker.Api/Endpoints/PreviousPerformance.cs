@@ -4,9 +4,10 @@ using RepTracker.Api.Data;
 namespace RepTracker.Api.Endpoints;
 
 /// <summary>
-/// Answers "what did I do last time?" for a set of exercises. This is the single most useful thing
-/// to have on screen mid-workout, so it is folded into the active-workout response rather than
-/// left to a follow-up request per exercise.
+/// Answers "what did I do last time?" for every exercise trained in the look-back window. This is the
+/// single most useful thing to have on screen mid-workout, and the phone runs the workout without
+/// the server, so it takes the lot in one request when the workout starts: one entry per exercise,
+/// a handful of sets each, which stays small even for a long training history.
 /// </summary>
 public static class PreviousPerformance
 {
@@ -14,20 +15,16 @@ public static class PreviousPerformance
     private static readonly TimeSpan LookBack = TimeSpan.FromDays(400);
 
     public static async Task<Dictionary<Guid, PreviousPerformanceDto>> LoadAsync(
-        AppDb db, Guid userId, IReadOnlyCollection<Guid> exerciseIds, Guid excludeWorkoutId, CancellationToken ct)
+        AppDb db, Guid userId, CancellationToken ct)
     {
-        if (exerciseIds.Count == 0) return [];
-
         var since = DateTimeOffset.UtcNow - LookBack;
 
-        // Narrow projection: three columns per past appearance of these exercises, which stays small
-        // even for a long training history, and keeps the query trivially translatable.
+        // Narrow projection: three columns per past appearance of an exercise, which keeps the query
+        // trivially translatable.
         var candidates = await db.WorkoutExercises
             .Where(we => we.Workout.UserId == userId
-                         && we.WorkoutId != excludeWorkoutId
                          && we.Workout.FinishedAt != null
                          && we.Workout.StartedAt >= since
-                         && exerciseIds.Contains(we.ExerciseId)
                          && we.Sets.Any(s => s.IsCompleted))
             .Select(we => new { we.Id, we.ExerciseId, we.Workout.StartedAt })
             .ToListAsync(ct);

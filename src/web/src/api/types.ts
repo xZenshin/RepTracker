@@ -99,6 +99,7 @@ export interface WorkoutExercise {
   restSeconds: number
   notes?: string | null
   sets: WorkoutSet[]
+  /** Last time's sets. Only on a workout in progress, which the phone lays out from GET /workouts/previous. */
   previous?: PreviousPerformance | null
 }
 
@@ -303,4 +304,49 @@ export interface ImportSummary {
   correctedDates: { written: string; corrected: string }[]
   errors: ImportError[]
   errorCount: number
+}
+
+/**
+ * What merging `from` into `into` did, or - before `committed` - would do. `combined` counts
+ * workouts that had both, whose sets end up under one; `hidden` means `from` is a built-in, hidden
+ * for this account rather than deleted.
+ */
+export interface MergeSummary {
+  committed: boolean
+  from: string
+  into: string
+  workouts: number
+  sets: number
+  combined: number
+  routines: number
+  hidden: boolean
+}
+
+export interface SuggestedSet {
+  setId: string
+  weightKg?: number | null
+  reps?: number | null
+  durationSeconds?: number | null
+  distanceM?: number | null
+}
+
+/**
+ * One session of an exercise, for correcting: as logged, beside the sessions either side, with
+ * `suggested` values for each set worked out from them. A flagged mistake always has both
+ * neighbours; the first and latest session lack one.
+ */
+export interface SessionReview {
+  workoutId: string
+  workoutExerciseId: string
+  startedAt: string
+  modality: Modality
+  sets: WorkoutSet[]
+  suggested: SuggestedSet[]
+  before?: SessionNeighbour | null
+  after?: SessionNeighbour | null
+}
+
+export interface SessionNeighbour {
+  startedAt: string
+  sets: PreviousSet[]
 }

@@ -54,13 +54,21 @@ public static class ImportEndpoints
 
         // ---- exercises: the catalogue and the user's own; anything unmatched would be created ----
 
-        var visible = await db.Exercises.Where(e => e.UserId == null || e.UserId == user.Id).ToListAsync(ct);
+        var merges = await db.ExerciseMerges.Where(m => m.UserId == user.Id).Include(m => m.Into).ToListAsync(ct);
+        var mergedAway = merges.Select(m => m.FromExerciseId).ToHashSet();
+        var visible = await db.Exercises
+            .Where(e => (e.UserId == null || e.UserId == user.Id) && !mergedAway.Contains(e.Id))
+            .ToListAsync(ct);
 
         // Matching ignores spacing, hyphens and case. A user's own exercise wins over a catalogue one
         // that reduces to the same letters.
         var byLooseKey = visible
             .GroupBy(e => WorkoutCsv.LooseKey(e.Name))
             .ToDictionary(g => g.Key, g => g.OrderBy(e => e.UserId == null ? 1 : 0).First());
+
+        // A name merged away lands on the exercise it was merged into - unless an exercise the user
+        // can see now goes by that name, which is the more direct match.
+        foreach (var merge in merges) byLooseKey.TryAdd(WorkoutCsv.LooseKey(merge.FromName), merge.Into);
 
         // Each spelling resolved once. A new exercise joins the lookup as soon as it is made, so
         // "Sled-Push" further down lands on the "Sled Push" made above it.

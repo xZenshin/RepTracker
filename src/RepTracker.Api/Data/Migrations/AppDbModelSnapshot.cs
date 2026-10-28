@@ -75,6 +75,32 @@ namespace RepTracker.Api.Data.Migrations
                     b.ToTable("Exercises");
                 });
 
+            modelBuilder.Entity("RepTracker.Api.Data.ExerciseMerge", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FromExerciseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FromName")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid>("IntoExerciseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("MergedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "FromExerciseId");
+
+                    b.HasIndex("IntoExerciseId");
+
+                    b.ToTable("ExerciseMerges");
+                });
+
             modelBuilder.Entity("RepTracker.Api.Data.Routine", b =>
                 {
                     b.Property<Guid>("Id")
@@ -259,11 +285,6 @@ namespace RepTracker.Api.Data.Migrations
 
                     b.HasIndex("RoutineId");
 
-                    b.HasIndex("UserId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_Workouts_OneActivePerUser")
-                        .HasFilter("\"FinishedAt\" IS NULL");
-
                     b.HasIndex("UserId", "StartedAt");
 
                     b.ToTable("Workouts");
@@ -349,6 +370,25 @@ namespace RepTracker.Api.Data.Migrations
                         .WithMany("Exercises")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("RepTracker.Api.Data.ExerciseMerge", b =>
+                {
+                    b.HasOne("RepTracker.Api.Data.Exercise", "Into")
+                        .WithMany()
+                        .HasForeignKey("IntoExerciseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("RepTracker.Api.Data.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Into");
 
                     b.Navigation("User");
                 });

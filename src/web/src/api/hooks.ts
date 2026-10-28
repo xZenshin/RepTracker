@@ -1,16 +1,18 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { api, ApiError, utcOffsetMinutes } from './client'
 import type {
-  CalendarDay, Exercise, ExerciseListItem, ExerciseStats, ImportSummary, Overview, Paged, RegisterResponse,
-  Routine, SaveRoutineExercise, Units, User, Workout, WorkoutSet, WorkoutSummary,
+  CalendarDay, Exercise, ExerciseListItem, ExerciseStats, ImportSummary, MergeSummary, Overview, Paged,
+  RegisterResponse, SessionReview,
+  Routine, SaveRoutineExercise, Units, User, Workout, WorkoutSummary,
 } from './types'
+import type { LastTime, SaveWorkoutRequest } from '../lib/liveWorkout'
 
 export const keys = {
   me: ['me'] as const,
   exercises: ['exercises'] as const,
   routines: ['routines'] as const,
   routine: (id: string) => ['routines', id] as const,
-  activeWorkout: ['workouts', 'active'] as const,
+  lastTime: ['workouts', 'previous'] as const,
   workouts: ['workouts', 'history'] as const,
   workout: (id: string) => ['workouts', id] as const,
   overview: (weeks: number) => ['stats', 'overview', weeks] as const,
@@ -136,6 +138,38 @@ export function useCreateExercise() {
   })
 }
 
+/**
+ * What merging one exercise into another would do, for the confirmation step. Re-asked every time
+ * the pair is chosen rather than cached: it describes the data as it stands now.
+ */
+export function useMergePreview(fromId: string | undefined, intoId: string | undefined) {
+  return useQuery({
+    // Not under ['exercises']: the merge refreshes that, and this preview of a pair that no longer
+    // exists would be asked again on the way out.
+    queryKey: ['merge-preview', fromId, intoId] as const,
+    queryFn: () => api<MergeSummary>('/exercises/merge', { method: 'POST', body: { fromId, intoId } }),
+    enabled: Boolean(fromId && intoId),
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+  })
+}
+
+/** Moves every set logged against `fromId` to `intoId`, and removes `fromId` from this account. */
+export function useMergeExercises() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { fromId: string; intoId: string }) =>
+      api<MergeSummary>('/exercises/merge?commit=true', { method: 'POST', body }),
+    onSuccess: () => {
+      // History, stats, last time's sets, routines and the picker all name exercises.
+      invalidateTraining(qc)
+      void qc.invalidateQueries({ queryKey: keys.exercises })
+      void qc.invalidateQueries({ queryKey: keys.routines })
+    },
+  })
+}
+
 // ---- routines ----
 
 export function useRoutines() {
@@ -177,15 +211,6 @@ export function useDeleteRoutine() {
 
 // ---- workouts ----
 
-export function useActiveWorkout() {
-  return useQuery({
-    queryKey: keys.activeWorkout,
-    // With no workout open the API answers 200 with an empty body, which the client reads as
-    // undefined - and a query may not resolve to undefined. Null is the "none open" state.
-    queryFn: async () => (await api<Workout | null>('/workouts/active')) ?? null,
-  })
-}
-
 export function useWorkout(id: string | undefined) {
   return useQuery({
     queryKey: keys.workout(id ?? ''),
@@ -223,27 +248,37 @@ export function useWorkoutMonth(month: Date) {
   })
 }
 
-export function useStartWorkout() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (body: { routineId?: string; name?: string }) =>
-      api<Workout>('/workouts', { method: 'POST', body }),
-    onSuccess: (workout) => {
-      qc.setQueryData(keys.activeWorkout, workout)
-      invalidateTraining(qc)
-    },
-  })
+/**
+ * Last time's sets for every exercise trained recently. A workout runs on the phone, so this is
+ * fetched once when it starts and everything it lays out - a routine, an added exercise, a swap -
+ * prefills from here without another request.
+ */
+export const lastTimeQuery = queryOptions({
+  queryKey: keys.lastTime,
+  queryFn: () => api<LastTime>('/workouts/previous'),
+  staleTime: 5 * 60_000,
+})
+
+export function useLastTime() {
+  return useQuery(lastTimeQuery)
 }
 
-export function useUpdateWorkout() {
+/**
+ * Sends a finished workout, whole. It is safe to retry - the workout carries its own id, and the
+ * server hands back the stored one rather than saving it twice - so a dropped connection is retried
+ * quietly before it is shown as an error. A refusal (4xx) is final and is not.
+ *
+ * Tried even when the phone reports no connection. The default would pause it until one returns,
+ * leaving "Saving..." on screen with no word of why; failing says so, and Finish can be tapped again.
+ */
+export function useSaveWorkout() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ...body }: { id: string; name?: string; notes?: string; finish?: boolean }) =>
-      api<Workout>(`/workouts/${id}`, { method: 'PATCH', body }),
-    onSuccess: (workout) => {
-      qc.setQueryData(keys.activeWorkout, workout.finishedAt ? null : workout)
-      invalidateTraining(qc)
-    },
+    mutationFn: (body: SaveWorkoutRequest) => api<Workout>('/workouts', { method: 'POST', body }),
+    networkMode: 'always',
+    retry: (failureCount, error) =>
+      failureCount < 2 && !(error instanceof ApiError && error.status < 500),
+    onSuccess: () => invalidateTraining(qc),
   })
 }
 
@@ -251,103 +286,7 @@ export function useDeleteWorkout() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => api<void>(`/workouts/${id}`, { method: 'DELETE' }),
-    onSuccess: () => {
-      qc.setQueryData(keys.activeWorkout, null)
-      invalidateTraining(qc)
-    },
-  })
-}
-
-export function useAddWorkoutExercise(workoutId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (exerciseId: string) =>
-      api<Workout>(`/workouts/${workoutId}/exercises`, { method: 'POST', body: { exerciseId } }),
-    onSuccess: (workout) => qc.setQueryData(keys.activeWorkout, workout),
-  })
-}
-
-/**
- * Trades a workout exercise for another. With sets already done the original keeps them and the
- * substitute is inserted after it; otherwise it is replaced where it stands.
- */
-export function useSwapWorkoutExercise(workoutId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ weId, exerciseId }: { weId: string; exerciseId: string }) =>
-      api<Workout>(`/workouts/${workoutId}/exercises/${weId}/swap`, { method: 'POST', body: { exerciseId } }),
-    onSuccess: (workout) => qc.setQueryData(keys.activeWorkout, workout),
-  })
-}
-
-export function useRemoveWorkoutExercise(workoutId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (weId: string) =>
-      api<void>(`/workouts/${workoutId}/exercises/${weId}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.activeWorkout }),
-  })
-}
-
-export function useUpdateWorkoutExercise(workoutId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ weId, ...body }: { weId: string; restSeconds?: number; notes?: string }) =>
-      api<void>(`/workouts/${workoutId}/exercises/${weId}`, { method: 'PATCH', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.activeWorkout }),
-  })
-}
-
-export interface SetInput {
-  weightKg?: number | null
-  reps?: number | null
-  durationSeconds?: number | null
-  distanceM?: number | null
-  rpe?: number | null
-  isCompleted?: boolean
-}
-
-export function useAddSet(workoutId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ weId, ...body }: SetInput & { weId: string }) =>
-      api<WorkoutSet>(`/workouts/${workoutId}/exercises/${weId}/sets`, { method: 'POST', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.activeWorkout }),
-  })
-}
-
-export function useUpdateSet(workoutId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ weId, setId, ...body }: SetInput & { weId: string; setId: string }) =>
-      api<WorkoutSet>(`/workouts/${workoutId}/exercises/${weId}/sets/${setId}`, {
-        method: 'PATCH',
-        body,
-      }),
-    // Written straight into the cached workout rather than refetching: mid-set, a full round trip
-    // plus reload makes the row flicker under your thumb.
-    onSuccess: (updated, variables) => {
-      qc.setQueryData<Workout | null>(keys.activeWorkout, (current) => {
-        if (!current) return current
-        return {
-          ...current,
-          exercises: current.exercises.map((we) =>
-            we.id !== variables.weId
-              ? we
-              : { ...we, sets: we.sets.map((s) => (s.id === updated.id ? updated : s)) },
-          ),
-        }
-      })
-    },
-  })
-}
-
-export function useDeleteSet(workoutId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ weId, setId }: { weId: string; setId: string }) =>
-      api<void>(`/workouts/${workoutId}/exercises/${weId}/sets/${setId}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.activeWorkout }),
+    onSuccess: () => invalidateTraining(qc),
   })
 }
 
@@ -381,6 +320,52 @@ export function useExerciseStats(id: string | undefined, weeks: number) {
     queryFn: () =>
       api<ExerciseStats>(`/stats/exercises/${id}?weeks=${weeks}&offsetMinutes=${utcOffsetMinutes()}`),
     enabled: Boolean(id),
+  })
+}
+
+/** Sessions of an exercise that look like logging mistakes, with a suggested fix for each set. */
+export function useOutliers(exerciseId: string | undefined) {
+  return useQuery({
+    queryKey: ['stats', 'exercises', exerciseId ?? '', 'outliers'] as const,
+    queryFn: () => api<SessionReview[]>(`/stats/exercises/${exerciseId}/outliers`),
+    enabled: Boolean(exerciseId),
+  })
+}
+
+/** One session of an exercise, picked from a chart, with the sessions either side. */
+export function useSessionReview(exerciseId: string | undefined, workoutId: string | undefined) {
+  return useQuery({
+    queryKey: ['stats', 'exercises', exerciseId ?? '', 'sessions', workoutId ?? ''] as const,
+    queryFn: () => api<SessionReview>(`/stats/exercises/${exerciseId}/sessions/${workoutId}`),
+    enabled: Boolean(exerciseId && workoutId),
+    // What is on screen is about to be edited; a refetch landing mid-edit is not wanted.
+    staleTime: Infinity,
+  })
+}
+
+export interface SetCorrection {
+  id: string
+  weightKg?: number | null
+  reps?: number | null
+  durationSeconds?: number | null
+  distanceM?: number | null
+}
+
+/**
+ * Corrects one exercise's sets in a saved workout: new values for `update`, gone for `remove`.
+ * Every statistic is worked out from the sets, so all of them are refetched.
+ */
+export function useCorrectSets() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ workoutId, workoutExerciseId, update, remove }: {
+      workoutId: string; workoutExerciseId: string; update?: SetCorrection[]; remove?: string[]
+    }) =>
+      api<Workout>(`/workouts/${workoutId}/exercises/${workoutExerciseId}/sets`, {
+        method: 'PATCH',
+        body: { update: update ?? [], remove: remove ?? [] },
+      }),
+    onSuccess: () => invalidateTraining(qc),
   })
 }
 

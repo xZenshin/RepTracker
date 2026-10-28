@@ -113,6 +113,29 @@ public class RoutineExercise
     [MaxLength(200)] public string? Notes { get; set; }
 }
 
+/// <summary>
+/// One exercise folded into another for one user: its history moved to <see cref="IntoExerciseId"/>,
+/// and it is gone from that user's lists - deleted if it was their own, hidden if it is in the shared
+/// catalogue. Kept so the old exercise can never come back in by another door: a workout still open
+/// on a phone, a routine editor left open, or a CSV that names it.
+/// </summary>
+public class ExerciseMerge
+{
+    public Guid UserId { get; set; }
+    public User User { get; set; } = null!;
+
+    /// <summary>No foreign key: a user's own exercise is deleted by the merge, and its id outlives it here.</summary>
+    public Guid FromExerciseId { get; set; }
+
+    /// <summary>Its name when merged, so an import that still uses it lands on the kept exercise.</summary>
+    [MaxLength(80)] public string FromName { get; set; } = "";
+
+    public Guid IntoExerciseId { get; set; }
+    public Exercise Into { get; set; } = null!;
+
+    public DateTimeOffset MergedAt { get; set; }
+}
+
 public class Workout
 {
     public Guid Id { get; set; }
@@ -127,7 +150,10 @@ public class Workout
     [MaxLength(1000)] public string? Notes { get; set; }
     public DateTimeOffset StartedAt { get; set; }
 
-    /// <summary>Null while the workout is still in progress. At most one unfinished workout per user.</summary>
+    /// <summary>
+    /// When the phone saved it. Always set: a workout in progress lives on the phone and is only
+    /// stored once finished. Nullable because rows from before that change were stored unfinished.
+    /// </summary>
     public DateTimeOffset? FinishedAt { get; set; }
 
     public List<WorkoutExercise> Exercises { get; set; } = [];

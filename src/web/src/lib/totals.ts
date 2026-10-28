@@ -1,15 +1,16 @@
 import type { Workout, WorkoutTotals } from '../api/types'
 
 /**
- * Recomputes a workout's totals from the sets currently on screen.
+ * A workout's totals from its sets.
  *
- * The server sends totals with every workout, but during a live session set edits are written
- * straight into the cache to keep the row from flickering under your thumb - which leaves the
- * server's totals a step behind. Deriving them here keeps the header honest without a refetch
- * on every tap. The rules match Formulas.cs on the server: completed working sets only, and
- * bodyweight movements carry the lifter's own mass.
+ * The server sends totals with every saved workout, but a workout in progress lives on the phone
+ * and the server has never seen it, so these are worked out here. The rules match Formulas.cs on
+ * the server: completed working sets only, and bodyweight movements carry the lifter's own mass.
  */
-export function computeTotals(workout: Workout, bodyWeightKg: number | null | undefined): WorkoutTotals {
+export function computeTotals(
+  workout: Pick<Workout, 'exercises' | 'startedAt' | 'finishedAt'>,
+  bodyWeightKg: number | null | undefined,
+): WorkoutTotals {
   let volume = 0
   let sets = 0
   let reps = 0
