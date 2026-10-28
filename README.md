@@ -50,5 +50,3 @@ dotnet run -- seed-demo      # prints a login code for an account with ~20 weeks
 `seed-demo` only runs in Development.
 
 ---
-
-How it is built, its traps, and what is deliberately missing are in [HANDOFF.md](HANDOFF.md).
