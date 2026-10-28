@@ -55,6 +55,20 @@
   height: 300px;
 }
 
+/* The range slider takes its height out of the plot, so the frame grows by as much. */
+.chart-frame.brushed {
+  height: 276px;
+}
+
+.chart-frame.tall.brushed {
+  height: 336px;
+}
+
+.chart-frame .recharts-brush-texts text {
+  fill: var(--ink-muted);
+  font-size: 11px;
+}
+
 .viz-tooltip {
   min-width: 150px;
   padding: 9px 11px;

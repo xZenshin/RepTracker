@@ -177,9 +177,18 @@ top set is more than 1.75x off from *every* one of the 3 sessions before and the
   **Remove** deletes sets. Only that exercise's sets in that workout change.
 
 **Clicking any point on the 1RM or volume chart** opens `SessionEditor` for that session: editable
-values, a remove toggle per set, and "Fill from the sessions around it". Recharts reports a click it
-has not tracked as `activeTooltipIndex: null`, and `Number(null)` is 0, so `pickHandler` must ignore
-null or it opens the first session.
+values, a remove toggle per set, and "Fill from the sessions around it". Both charts go through
+`useSessionChart`, and three things in it are load-bearing:
+
+- **The x axis is keyed by workout id**, and the date is only its tick text. Recharts finds the
+  hovered row by matching the axis value, first match wins, so a date without the year sent every
+  hover in a later year to the earlier session. A click reads the session from `activeLabel`, not
+  an index, which would count from the start of the brushed range.
+- **Past 80 sessions a range slider (`Brush`) appears.** Three years of one exercise leaves a pixel
+  or two per session, some none, so they can't be hovered. The range is held in state, and a
+  press that starts on the slider is not a pick, or letting go of a drag opens the editor.
+- **Chart rows are memoised.** A new data array makes Recharts rebuild the brush, which broke
+  every drag after its first step.
 
 ---
 

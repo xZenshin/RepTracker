@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  Bar, BarChart, CartesianGrid, Dot, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, BarChart, Brush, CartesianGrid, Dot, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { useExerciseStats, useMe, useStatExercises } from '../api/hooks'
 import type { ExerciseSessionPoint, Trend, Units } from '../api/types'
@@ -186,17 +186,66 @@ export default function ExerciseDetail() {
 }
 
 /**
- * Charts take a click anywhere, not just on a dot: it picks the session the tooltip is showing,
- * which is the nearest one. Most 1RM points are not drawn as dots at all.
+ * Every session is one slot across the plot, so a few hundred of them leave a pixel or two each -
+ * some none at all - and a session can no longer be hovered or picked. Past this many the chart
+ * gets a range slider to narrow it to a stretch where each session has room again.
  */
-function pickHandler(rows: { workoutId: string }[], onPick: (workoutId: string) => void) {
-  return (state: { activeTooltipIndex?: number | string | null } | null) => {
-    // Null when the click lands before the chart has registered the pointer - and Number(null)
-    // is 0, which would open the first session rather than none.
-    const raw = state?.activeTooltipIndex
-    if (raw === null || raw === undefined || raw === '') return
-    const row = rows[Number(raw)]
-    if (row) onPick(row.workoutId)
+const BRUSH_FROM = 80
+
+/**
+ * What both session charts share: the x axis, the click that picks a session, and the range slider.
+ *
+ * Sessions are keyed by workout id on the x axis, never by their printed date. Recharts finds the
+ * hovered row by matching the axis value, first match wins, so with "12 Jul" in two years every
+ * hover in the later year showed the earlier session. Keyed by id, the active label *is* the
+ * session, which also holds inside a brushed range where an index would count from its start.
+ */
+function useSessionChart(rows: { workoutId: string; date: string }[], onPick: (workoutId: string) => void) {
+  const [range, setRange] = useState<{ startIndex: number; endIndex: number; count: number } | null>(null)
+  // A press that starts on the slider is a drag, and the click it ends in is not a pick.
+  const pressedOnBrush = useRef(false)
+
+  const spansYears = rows.length > 1 && rows[0].date.slice(0, 4) !== rows[rows.length - 1].date.slice(0, 4)
+  const labels = new Map(rows.map((row) => [row.workoutId, shortDate(row.date, spansYears)]))
+  const label = (id: string) => labels.get(id) ?? ''
+
+  // Held here, not left to the Brush: Recharts resets its range whenever the data array changes,
+  // so saving a correction - which refetches the sessions - would throw the range away. A range is
+  // indexes into one set of rows, so a period with a different number of sessions starts over.
+  const kept = range?.count === rows.length ? range : null
+
+  const brush = rows.length > BRUSH_FROM ? (
+    <Brush
+      dataKey="workoutId"
+      height={26}
+      travellerWidth={8}
+      stroke="var(--border-strong)"
+      fill="var(--surface-2)"
+      tickFormatter={label}
+      ariaLabel="Range of sessions shown"
+      startIndex={kept?.startIndex ?? 0}
+      endIndex={kept?.endIndex ?? rows.length - 1}
+      onChange={({ startIndex, endIndex }) => setRange({ startIndex, endIndex, count: rows.length })}
+    />
+  ) : null
+
+  return {
+    label,
+    brush,
+    frameClass: brush ? ' brushed' : '',
+    onMouseDownCapture: (event: MouseEvent) => {
+      pressedOnBrush.current = (event.target as Element).closest('.recharts-brush') != null
+    },
+    /**
+     * Charts take a click anywhere, not just on a dot: it picks the session the tooltip is
+     * showing, which is the nearest one. Most 1RM points are not drawn as dots at all.
+     */
+    onClick: (state: { activeLabel?: string | number } | null) => {
+      if (pressedOnBrush.current) return
+      // Missing when the click lands before the chart has registered the pointer.
+      const id = state?.activeLabel
+      if (rows.some((row) => row.workoutId === id)) onPick(id as string)
+    },
   }
 }
 
@@ -231,29 +280,31 @@ function TrendValue({ trend, units }: { trend: Trend; units: Units }) {
 function OneRepMaxChart({
   sessions, units, onPick,
 }: { sessions: ExerciseSessionPoint[]; units: Units; onPick: (workoutId: string) => void }) {
-  const rows = sessions
+  // Memoised: a new array is new data to Recharts, which rebuilds the brush mid-drag.
+  const rows = useMemo(() => sessions
     .filter((session) => session.estimatedOneRepMax != null)
     .map((session) => ({
       workoutId: session.workoutId,
       date: session.date,
-      label: shortDate(session.date),
       value: round(toDisplay(session.estimatedOneRepMax, units)),
       top: round(toDisplay(session.topSetWeightKg, units)),
       reps: session.topSetReps,
       isRecord: session.isRecord,
-    }))
+    })), [sessions, units])
+  const chart = useSessionChart(rows, onPick)
 
   if (rows.length < 2) {
     return <p className="muted small">At least two sessions are needed to draw a line.</p>
   }
 
   return (
-    <div className="chart-frame tall pickable">
+    <div className={`chart-frame tall pickable${chart.frameClass}`} onMouseDownCapture={chart.onMouseDownCapture}>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={rows} margin={{ top: 8, right: 10, bottom: 0, left: -14 }} onClick={pickHandler(rows, onPick)}>
+        <LineChart data={rows} margin={{ top: 8, right: 10, bottom: 0, left: -14 }} onClick={chart.onClick}>
           <CartesianGrid stroke="var(--grid)" vertical={false} />
           <XAxis
-            dataKey="label"
+            dataKey="workoutId"
+            tickFormatter={chart.label}
             stroke="var(--axis)"
             tick={{ fill: 'var(--ink-muted)', fontSize: 11 }}
             tickLine={false}
@@ -264,7 +315,10 @@ function OneRepMaxChart({
             tick={{ fill: 'var(--ink-muted)', fontSize: 11 }}
             tickLine={false}
             axisLine={false}
-            domain={['dataMin - 5', 'dataMax + 5']}
+            // Whole numbers at both ends. 'dataMin - 5' is plain float maths, so 16.1 - 5 gave a
+            // 11.100000000000001 floor that every tick stepped up from inherited.
+            domain={[(min: number) => Math.floor(min - 5), (max: number) => Math.ceil(max + 5)]}
+            allowDecimals={false}
           />
           <Tooltip
             cursor={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
@@ -313,6 +367,7 @@ function OneRepMaxChart({
             activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--surface)' }}
             isAnimationActive={false}
           />
+          {chart.brush}
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -322,29 +377,31 @@ function OneRepMaxChart({
 function SessionVolumeChart({
   sessions, units, onPick,
 }: { sessions: ExerciseSessionPoint[]; units: Units; onPick: (workoutId: string) => void }) {
-  const rows = sessions.map((session) => ({
+  // Memoised: a new array is new data to Recharts, which rebuilds the brush mid-drag.
+  const rows = useMemo(() => sessions.map((session) => ({
     workoutId: session.workoutId,
     date: session.date,
-    label: shortDate(session.date),
     value: round(toDisplay(session.volumeKg, units)),
     sets: session.sets,
     reps: session.reps,
-  }))
+  })), [sessions, units])
+  const chart = useSessionChart(rows, onPick)
 
   if (rows.length === 0) return <p className="muted small">No sessions in this period.</p>
 
   return (
-    <div className="chart-frame pickable">
+    <div className={`chart-frame pickable${chart.frameClass}`} onMouseDownCapture={chart.onMouseDownCapture}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={rows}
-          onClick={pickHandler(rows, onPick)}
+          onClick={chart.onClick}
           margin={{ top: 4, right: 10, bottom: 0, left: -14 }}
           barCategoryGap="20%"
         >
           <CartesianGrid stroke="var(--grid)" vertical={false} />
           <XAxis
-            dataKey="label"
+            dataKey="workoutId"
+            tickFormatter={chart.label}
             stroke="var(--axis)"
             tick={{ fill: 'var(--ink-muted)', fontSize: 11 }}
             tickLine={false}
@@ -381,19 +438,23 @@ function SessionVolumeChart({
           <Bar dataKey="value" fill="var(--series-1)" radius={[4, 4, 0, 0]} maxBarSize={30}
             isAnimationActive={false}
             // A bar hit directly is that bar's session, whether or not the chart has seen the pointer.
-            onClick={(_, index) => {
-              const row = rows[index]
-              if (row) onPick(row.workoutId)
+            // Read from the bar's own row: its index counts from the start of the brushed range.
+            onClick={(entry) => {
+              const id = (entry.payload as (typeof rows)[number] | undefined)?.workoutId
+              if (id) onPick(id)
             }}
           />
+          {chart.brush}
         </BarChart>
       </ResponsiveContainer>
     </div>
   )
 }
 
-function shortDate(date: string) {
-  return new Date(date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+function shortDate(date: string, withYear: boolean) {
+  return new Date(date).toLocaleDateString(undefined, {
+    day: 'numeric', month: 'short', year: withYear ? '2-digit' : undefined,
+  })
 }
 
 function round(value: number | null) {
